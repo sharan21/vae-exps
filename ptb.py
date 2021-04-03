@@ -11,12 +11,15 @@ from utils import OrderedCounter
 
 class PTB(Dataset):
 
-    def __init__(self, data_dir, split, create_data, **kwargs):
+    def __init__(self, split, create_data, **kwargs):
 
         super().__init__()
-        self.data_dir = data_dir
+        self.data_dir = "./data/ptb/"
         self.split = split
+
         self.max_sequence_length = kwargs.get('max_sequence_length', 50)
+        self.max_sequence_length = 50
+
         self.min_occ = kwargs.get('min_occ', 3)
 
         self.raw_data_path = os.path.join(data_dir, 'ptb.'+split+'.txt')
@@ -167,3 +170,45 @@ class PTB(Dataset):
             vocab_file.write(data.encode('utf8', 'replace'))
 
         self._load_vocab()
+
+    def convert_(self):
+
+        if self.split == 'train':
+            self._create_vocab()
+        else:
+            self._load_vocab()
+
+        tokenizer = TweetTokenizer(preserve_case=False)
+
+        data = defaultdict(dict)
+        with open(self.raw_data_path, 'r') as file:
+
+            for i, line in enumerate(file):
+
+                words = tokenizer.tokenize(line)
+
+                input = ['<sos>'] + words
+                input = input[:self.max_sequence_length]
+
+                target = words[:self.max_sequence_length-1]
+                target = target + ['<eos>']
+
+                assert len(input) == len(target), "%i, %i"%(len(input), len(target))
+                length = len(input)
+
+                input.extend(['<pad>'] * (self.max_sequence_length-length))
+                target.extend(['<pad>'] * (self.max_sequence_length-length))
+
+                input = [self.w2i.get(w, self.w2i['<unk>']) for w in input]
+                target = [self.w2i.get(w, self.w2i['<unk>']) for w in target]
+
+                id = len(data)
+                data[id]['input'] = input
+                data[id]['target'] = target
+                data[id]['length'] = length
+
+        with io.open(os.path.join(self.data_dir, self.data_file), 'wb') as data_file:
+            data = json.dumps(data, ensure_ascii=False)
+            data_file.write(data.encode('utf8', 'replace'))
+
+        self._load_data(vocab=False)

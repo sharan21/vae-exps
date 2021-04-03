@@ -22,7 +22,7 @@ class SentenceVAE(nn.Module):
         self.rnn_type = rnn_type
         self.bidirectional = bidirectional
         self.num_layers = num_layers
-        self.hidden_size = hidden_size
+        self.hidden_size = hidden_size 
 
         self.embedding = nn.Embedding(vocab_size, embedding_size)
         self.word_dropout_rate = word_dropout
@@ -51,30 +51,35 @@ class SentenceVAE(nn.Module):
 
     def forward(self, input_sequence, length):
 
-        batch_size = input_sequence.size(0)
-        sorted_lengths, sorted_idx = torch.sort(length, descending=True)
-        input_sequence = input_sequence[sorted_idx]
+        batch_size = input_sequence.size(0) #get batch size
+        sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
+        input_sequence = input_sequence[sorted_idx] #get sorted sentences
 
-        # ENCODER
-        input_embedding = self.embedding(input_sequence)
+        input_embedding = self.embedding(input_sequence) # convert to embeddings
 
-        packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True)
+        #pad inputs to uniform length
+        packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True) #(B, L, E)
 
-        _, hidden = self.encoder_rnn(packed_input)
+        _, hidden = self.encoder_rnn(packed_input) # hidden -> (B, H)
 
+        # if the RNN has multiple layers, flatten all the hiddens states 
         if self.bidirectional or self.num_layers > 1:
             # flatten hidden state
             hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor)
         else:
             hidden = hidden.squeeze()
 
-        # REPARAMETERIZATION
-        mean = self.hidden2mean(hidden)
-        logv = self.hidden2logv(hidden)
-        std = torch.exp(0.5 * logv)
+        
+        #encoder RNN done, hidden now contains the final hidden states to be mapped into prob dist.
 
-        z = to_var(torch.randn([batch_size, self.latent_size]))
-        z = z * std + mean
+        # REPARAMETERIZATION
+
+        mean = self.hidden2mean(hidden) #calc latent mean 
+        logv = self.hidden2logv(hidden) #calc latent variance
+        std = torch.exp(0.5 * logv) #find sd
+
+        z = to_var(torch.randn([batch_size, self.latent_size])) #get a random vector
+        z = z * std + mean #compute datapoint
 
         # DECODER
         hidden = self.latent2hidden(z)
@@ -114,6 +119,7 @@ class SentenceVAE(nn.Module):
 
         return logp, mean, logv, z
 
+    
     def inference(self, n=4, z=None):
 
         if z is None:
@@ -195,3 +201,35 @@ class SentenceVAE(nn.Module):
         save_to[running_seqs] = running_latest
 
         return save_to
+
+    def encode_to_lspace(self, input_sequence, length):
+
+        batch_size = input_sequence.size(0) #get batch size
+        sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
+        input_sequence = input_sequence[sorted_idx] #get sorted sentences
+
+        input_embedding = self.embedding(input_sequence) # convert to embeddings
+
+        #pad inputs to uniform length
+        packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True) #(B, L, E)
+
+        _, hidden = self.encoder_rnn(packed_input) # hidden -> (B, H)
+
+        # if the RNN has multiple layers, flatten all the hiddens states 
+        if self.bidirectional or self.num_layers > 1:
+            # flatten hidden state
+            hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor)
+        else:
+            hidden = hidden.squeeze()
+
+        #encoder RNN done, hidden now contains the final hidden states to be mapped into prob dist.
+
+        # REPARAMETERIZATION
+        mean = self.hidden2mean(hidden) #calc latent mean 
+        logv = self.hidden2logv(hidden) #calc latent variance
+        std = torch.exp(0.5 * logv) #find sd
+
+        z = to_var(torch.randn([batch_size, self.latent_size])) #get a random vector
+        z = z * std + mean #compute datapoint
+
+        return z
