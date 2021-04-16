@@ -8,7 +8,7 @@ from utils import to_var, idx2word, interpolate
 
 
 def main(args):
-    with open(args.data_dir+'/yelp.vocab.json', 'r') as file:
+    with open(args.data_dir+'/yelp/yelp.vocab.json', 'r') as file:
         vocab = json.load(file)
 
     w2i, i2w = vocab['w2i'], vocab['i2w']

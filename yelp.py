@@ -35,7 +35,7 @@ class Yelp(Dataset):
         self.min_occ = kwargs.get('min_occ', 3)
 
         # self.num_lines = 560000
-        self.num_lines = 56000
+        self.num_lines = 5600
 
         self.have_vocab = have_vocab
 
@@ -131,6 +131,14 @@ class Yelp(Dataset):
                 if(i == self.num_lines):
                     break
 
+                # separate the label and the line
+                label = int(line[1])
+                line = line[4:]
+
+                # print(type(label))
+                # print(line[4:])
+                # exit()
+                
                 words = tokenizer.tokenize(line)
 
                 input = ['<sos>'] + words
@@ -139,8 +147,7 @@ class Yelp(Dataset):
                 target = words[:self.max_sequence_length-1]
                 target = target + ['<eos>']
 
-                assert len(input) == len(target), "%i, %i" % (
-                    len(input), len(target))
+                assert len(input) == len(target), "%i, %i" % (len(input), len(target))
                 length = len(input)
 
                 input.extend(['<pad>'] * (self.max_sequence_length-length))
@@ -151,6 +158,7 @@ class Yelp(Dataset):
 
                 id = len(data)
                 data[id]['input'] = input
+                data[id]['label'] = label
                 data[id]['target'] = target
                 data[id]['length'] = length
 
