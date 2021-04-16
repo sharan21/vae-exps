@@ -22,7 +22,7 @@ class PTB(Dataset):
 
         self.min_occ = kwargs.get('min_occ', 3)
 
-        self.raw_data_path = os.path.join(data_dir, 'ptb.'+split+'.txt')
+        self.raw_data_path = os.path.join(self.data_dir, 'ptb.'+split+'.txt')
         self.data_file = 'ptb.'+split+'.json'
         self.vocab_file = 'ptb.vocab.json'
 

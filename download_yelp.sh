@@ -8,4 +8,4 @@ rm -r data/yelp/yelp_review_polarity_csv/
 rm data/yelp/data.tgz
 
 mv ./data/yelp/test.csv ./data/yelp/yelp.test.csv 
-mv ./data/yelp/trainn.csv ./data/yelp/yelp.train.csv 
+mv ./data/yelp/train.csv ./data/yelp/yelp.train.csv 

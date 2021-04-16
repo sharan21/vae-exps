@@ -27,6 +27,7 @@ class Yelp(Dataset):
 
         super().__init__()
         self.data_dir = "./data/yelp/"
+        self.save_model_path = "./bin"
         self.split = split
 
         # self.max_sequence_length = 1165
@@ -125,9 +126,9 @@ class Yelp(Dataset):
         data = defaultdict(dict)
         with open(self.raw_data_path, 'r') as file:
 
-            for i, line in enumerate(tqdm(file, total=self.processed_lines)):
+            for i, line in enumerate(tqdm(file, total=self.num_lines)):
 
-                if(i == self.processed_lines):
+                if(i == self.num_lines):
                     break
 
                 words = tokenizer.tokenize(line)
@@ -175,16 +176,24 @@ class Yelp(Dataset):
             i2w[len(w2i)] = st
             w2i[st] = len(w2i)
 
+        print("here")
+
         with open(self.raw_data_path, 'r') as file:
 
             for i, line in enumerate(tqdm(file, total=self.num_lines)):
+                if(i == self.num_lines):
+                    break
                 words = tokenizer.tokenize(line)
                 w2c.update(words)
 
-            for w, c in w2c.items():
+
+            print("done creating w2c")
+            for w, c in tqdm(w2c.items()):
                 if c > self.min_occ and w not in special_tokens:
                     i2w[len(w2i)] = w
                     w2i[w] = len(w2i)
+
+            print("done creating w2i")
 
         assert len(w2i) == len(i2w)
 

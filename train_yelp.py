@@ -50,7 +50,7 @@ def main(args):
         eos_idx=datasets['train'].eos_idx,
         pad_idx=datasets['train'].pad_idx,
         unk_idx=datasets['train'].unk_idx,
-        max_sequence_length=args.max_sequence_length,
+        max_sequence_length=datasets['train'].max_sequence_length,
         embedding_size=args.embedding_size,
         rnn_type=args.rnn_type,
         hidden_size=args.hidden_size,
@@ -77,7 +77,7 @@ def main(args):
         writer.add_text("ts", ts)
 
     # make dir
-    save_model_path = os.path.join(args.save_model_path, ts)
+    save_model_path = os.path.join(datasets["train"].save_model_path, ts)
     os.makedirs(save_model_path)
 
     # write params to json and save
