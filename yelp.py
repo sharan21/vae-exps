@@ -35,7 +35,7 @@ class Yelp(Dataset):
         self.min_occ = kwargs.get('min_occ', 3)
 
         # self.num_lines = 560000
-        self.num_lines = 5600
+        self.num_lines = 56000
 
         self.have_vocab = have_vocab
 
