@@ -49,6 +49,7 @@ class SentenceVAE2(nn.Module):
         self.hidden2contentlogv = nn.Linear(hidden_size * self.hidden_factor, int(3*latent_size/4))
 
         # classifiers
+        self.content_classifier = nn.Linear(int(3*latent_size/4), mconfig.content_bow_dim)
         self.style_classifier = nn.Linear(int(latent_size/4), 2) # for correlating style space to sentiment
 
         # dsicrimimnator/adversaries
@@ -176,12 +177,30 @@ class SentenceVAE2(nn.Module):
         smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
         
         # calculate cross entropy loss
-        ones = torch.ones(batch_size, 1).cuda()
-        trythis = ones - preds[:, 0]
+        preds_max = torch.ones(batch_size, 1).cuda() - preds[:, 0] #only choose the label with the larger prob
         
-        style_mul_loss = nn.BCELoss()(preds[:, 0], labels.type(torch.FloatTensor).cuda())
+        style_mul_loss = nn.BCELoss()(preds_max[:, 0], labels.type(torch.FloatTensor).cuda())
 
         return style_mul_loss
+
+    def get_content_mul_loss(self, content_emb, content_bow):
+        """
+        This loss quantifies the amount of content information preserved
+        in the content space
+        Returns:
+        cross entropy loss of the content classifier
+        """
+        # predictions
+        preds = nn.Softmax(dim=1)(
+            self.content_classifier(self.dropout(content_emb)))
+        # label smoothing
+        smoothed_content_bow = content_bow * \
+            (1-mconfig.label_smoothing) + \
+            mconfig.label_smoothing/mconfig.content_bow_dim
+        # calculate cross entropy loss
+        content_mul_loss = nn.BCELoss()(preds, smoothed_content_bow)
+
+        return content_mul_loss
 
     
     def inference(self, n=4, z=None):
