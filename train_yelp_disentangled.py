@@ -148,16 +148,16 @@ def main(args):
 
                 # get batch size
                 batch_size = batch['input'].size(0)
+                print(batch.keys())
 
-                # print(batch['input'].shape)
-                # exit(0)
+                exit()
 
                 for k, v in batch.items():
                     if torch.is_tensor(v):
                         batch[k] = to_var(v)
 
                 # Forward pass
-                logp, mean, logv, z = model(batch['input'], batch['length'])
+                logp, mean, logv, z = model(batch['input'], batch['length'], batch['label'])
 
                 # loss calculation
                 NLL_loss, KL_loss, KL_weight = loss_fn(

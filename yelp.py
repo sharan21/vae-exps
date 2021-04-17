@@ -135,9 +135,6 @@ class Yelp(Dataset):
                 label = int(line[1])
                 line = line[4:]
 
-                # print(type(label))
-                # print(line[4:])
-                # exit()
                 
                 words = tokenizer.tokenize(line)
 

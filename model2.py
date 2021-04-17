@@ -48,13 +48,22 @@ class SentenceVAE2(nn.Module):
         self.hidden2contentmean = nn.Linear(hidden_size * self.hidden_factor, int(3*latent_size/4))
         self.hidden2contentlogv = nn.Linear(hidden_size * self.hidden_factor, int(3*latent_size/4))
 
+        # classifiers
+        self.style_classifier = nn.Linear(int(3*latent_size/4), 2) # for correlating style space to sentiment
+
+        # dsicrimimnator/adversaries
+
         # latent to initial hs for decoder
         self.latent2hidden = nn.Linear(latent_size, hidden_size * self.hidden_factor)
 
         # final hidden to output vocab
         self.outputs2vocab = nn.Linear(hidden_size * (2 if bidirectional else 1), vocab_size)
 
-    def forward(self, input_sequence, length):
+        #extra parameters for style disentg.
+        self.label_smoothing = 0.1
+        self.num_style = 2
+
+    def forward(self, input_sequence, length, labels):
 
         batch_size = input_sequence.size(0) #get batch size
         sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
@@ -102,6 +111,9 @@ class SentenceVAE2(nn.Module):
         final_mean = torch.cat((style_mean, content_mean), dim=1)
         final_logv = torch.cat((style_logv, content_logv), dim=1)
         final_z = torch.cat((style_z, content_z), dim=1)
+
+        #style and content classifiers
+        style_mul_loss = get_style_mul_loss(style_z, labels)
         
 
         # DECODER
@@ -115,14 +127,17 @@ class SentenceVAE2(nn.Module):
 
         # decoder input
         if self.word_dropout_rate > 0:
+            
             # randomly replace decoder input with <unk>
             prob = torch.rand(input_sequence.size())
+            
             if torch.cuda.is_available():
                 prob=prob.cuda()
             prob[(input_sequence.data - self.sos_idx) * (input_sequence.data - self.pad_idx) == 0] = 1
             decoder_input_sequence = input_sequence.clone()
             decoder_input_sequence[prob < self.word_dropout_rate] = self.unk_idx
             input_embedding = self.embedding(decoder_input_sequence)
+
         input_embedding = self.embedding_dropout(input_embedding)
         packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True)
 
@@ -141,6 +156,24 @@ class SentenceVAE2(nn.Module):
         logp = logp.view(b, s, self.embedding.num_embeddings)
 
         return logp, final_mean, final_logv, final_z
+
+    def get_style_mul_loss(self, style_z, labels):
+        """
+        This loss quantifies the amount of style information preserved
+        in the style space
+        Returns:
+        cross entropy loss of the style classifier
+        """
+        # predictions
+        preds = nn.Softmax(dim=1)(self.style_classifier(self.dropout(style_z)))
+        
+        # label smoothing
+        smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
+        
+        # calculate cross entropy loss
+        style_mul_loss = nn.BCELoss()(preds, smoothed_style_labels)
+
+        return style_mul_loss
 
     
     def inference(self, n=4, z=None):
