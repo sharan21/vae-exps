@@ -148,9 +148,9 @@ def main(args):
 
                 # get batch size
                 batch_size = batch['input'].size(0)
-                print(batch.keys())
+                # print(batch.keys())
 
-                exit()
+                # exit()
 
                 for k, v in batch.items():
                     if torch.is_tensor(v):

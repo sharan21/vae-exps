@@ -49,7 +49,7 @@ class SentenceVAE2(nn.Module):
         self.hidden2contentlogv = nn.Linear(hidden_size * self.hidden_factor, int(3*latent_size/4))
 
         # classifiers
-        self.style_classifier = nn.Linear(int(3*latent_size/4), 2) # for correlating style space to sentiment
+        self.style_classifier = nn.Linear(int(latent_size/4), 2) # for correlating style space to sentiment
 
         # dsicrimimnator/adversaries
 
@@ -60,8 +60,13 @@ class SentenceVAE2(nn.Module):
         self.outputs2vocab = nn.Linear(hidden_size * (2 if bidirectional else 1), vocab_size)
 
         #extra parameters for style disentg.
+        
+
         self.label_smoothing = 0.1
         self.num_style = 2
+        self.dropout_rate = 0.5
+
+        self.dropout = nn.Dropout(self.dropout_rate)
 
     def forward(self, input_sequence, length, labels):
 
@@ -113,8 +118,7 @@ class SentenceVAE2(nn.Module):
         final_z = torch.cat((style_z, content_z), dim=1)
 
         #style and content classifiers
-        style_mul_loss = get_style_mul_loss(style_z, labels)
-        
+        style_mul_loss = self.get_style_mul_loss(style_z, labels, batch_size)
 
         # DECODER
         hidden = self.latent2hidden(final_z)
@@ -157,7 +161,7 @@ class SentenceVAE2(nn.Module):
 
         return logp, final_mean, final_logv, final_z
 
-    def get_style_mul_loss(self, style_z, labels):
+    def get_style_mul_loss(self, style_z, labels, batch_size):
         """
         This loss quantifies the amount of style information preserved
         in the style space
@@ -165,13 +169,17 @@ class SentenceVAE2(nn.Module):
         cross entropy loss of the style classifier
         """
         # predictions
+    
         preds = nn.Softmax(dim=1)(self.style_classifier(self.dropout(style_z)))
         
         # label smoothing
         smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
         
         # calculate cross entropy loss
-        style_mul_loss = nn.BCELoss()(preds, smoothed_style_labels)
+        ones = torch.ones(batch_size, 1).cuda()
+        trythis = ones - preds[:, 0]
+        
+        style_mul_loss = nn.BCELoss()(preds[:, 0], labels.type(torch.FloatTensor).cuda())
 
         return style_mul_loss
 

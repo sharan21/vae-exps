@@ -65,6 +65,7 @@ class Yelp(Dataset):
         return {
             'input': np.asarray(self.data[idx]['input']),
             'target': np.asarray(self.data[idx]['target']),
+            'label': np.asarray(self.data[idx]['label']),
             'length': self.data[idx]['length']
         }
 
@@ -132,7 +133,7 @@ class Yelp(Dataset):
                     break
 
                 # separate the label and the line
-                label = int(line[1])
+                label = float(line[1])
                 line = line[4:]
 
                 
@@ -211,7 +212,7 @@ class Yelp(Dataset):
 
         self._load_vocab()
 
-    def convert_(self):
+    def convert_(self): #does not seemed to be used
 
         if self.split == 'train':
             self._create_vocab()
