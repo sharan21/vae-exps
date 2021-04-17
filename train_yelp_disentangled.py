@@ -27,6 +27,7 @@ def main(args):
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
     ts = ts.replace(':', '-')
+    ts = ts+'-yelp-disentg'
 
     # prepare dataset
     splits = ['train', 'test']
@@ -233,10 +234,10 @@ if __name__ == '__main__':
     # parser.add_argument('--data_dir', type=str, default='data')
     parser.add_argument('--create_data', action='store_true')
     # parser.add_argument('--max_sequence_length', type=int, default=116)
-    parser.add_argument('--min_occ', type=int, default=1)
+    parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=3)
+    parser.add_argument('-ep', '--epochs', type=int, default=22)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 

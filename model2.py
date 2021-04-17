@@ -99,7 +99,10 @@ class SentenceVAE2(nn.Module):
 
         #concat style and concat
 
+        final_mean = torch.cat((style_mean, content_mean), dim=1)
+        final_logv = torch.cat((style_logv, content_logv), dim=1)
         final_z = torch.cat((style_z, content_z), dim=1)
+        
 
         # DECODER
         hidden = self.latent2hidden(final_z)
@@ -137,7 +140,7 @@ class SentenceVAE2(nn.Module):
         logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
         logp = logp.view(b, s, self.embedding.num_embeddings)
 
-        return logp, mean, logv, z
+        return logp, final_mean, final_logv, final_z
 
     
     def inference(self, n=4, z=None):
