@@ -178,11 +178,13 @@ class SentenceVAE2(nn.Module):
         
         # label smoothing
         smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
-        
-        # calculate cross entropy loss
+    
         preds_max = torch.ones(batch_size, 1).cuda() - preds[:, 0] #only choose the label with the larger prob
         
-        style_mul_loss = nn.BCELoss()(preds_max[:, 0], labels.type(torch.FloatTensor).cuda())
+        # calculate cross entropy loss
+        
+        # print(labels.shape)
+        style_mul_loss = nn.BCELoss()(preds, labels.type(torch.FloatTensor).cuda())
 
         return style_mul_loss
 

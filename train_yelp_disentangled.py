@@ -17,7 +17,7 @@ from utils import OrderedCounter
 from tqdm import tqdm
 
 from model2 import SentenceVAE2
-from yelp import Yelp
+from yelpd import Yelpd         
 
 import argparse
 
@@ -38,7 +38,7 @@ def main(args):
     # create test and train split in data, also preprocess
     for split in splits:
         print("creating dataset for: {}".format(split))
-        datasets[split] = Yelp(
+        datasets[split] = Yelpd(
             split=split,
             create_data=args.create_data,
             min_occ=args.min_occ
@@ -162,13 +162,16 @@ def main(args):
 
 
                 # final loss calculation
-                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size
-                loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
+                loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    loss.backward()  # run bp
+                    # loss.backward()  # run bp
+                    loss.backward(retain_graph=True)  # run bp
+                    style_mul_loss.backward(retain_graph=True) 
+                    content_mul_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
 
@@ -193,9 +196,9 @@ def main(args):
                     #       % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
                     #          KL_loss.item()/batch_size, KL_weight))
 
-                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f"
+                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f"
                           % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
-                             KL_loss.item()/batch_size, KL_weight, style_mul_loss))
+                             KL_loss.item()/batch_size, KL_weight, style_mul_loss, content_mul_loss))
 
                 if split == 'valid':
                     if 'target_sents' not in tracker:
@@ -240,7 +243,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=22)
+    parser.add_argument('-ep', '--epochs', type=int, default=1)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
