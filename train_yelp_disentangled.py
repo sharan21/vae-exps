@@ -148,16 +148,14 @@ def main(args):
 
                 # get batch size
                 batch_size = batch['input'].size(0)
-                # print(batch.keys())
 
-                # exit()
 
                 for k, v in batch.items():
                     if torch.is_tensor(v):
                         batch[k] = to_var(v)
 
                 # Forward pass
-                logp, mean, logv, z = model(batch['input'], batch['length'], batch['label'])
+                logp, mean, logv, z = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # loss calculation
                 NLL_loss, KL_loss, KL_weight = loss_fn(
@@ -174,8 +172,7 @@ def main(args):
                     step += 1
 
                 # bookkeepeing
-                tracker['ELBO'] = torch.cat(
-                    (tracker['ELBO'], loss.data.view(1, -1)), dim=0)
+                tracker['ELBO'] = torch.cat((tracker['ELBO'], loss.data.view(1, -1)), dim=0)
 
                 # logging of losses
                 if args.tensorboard_logging:

@@ -2,6 +2,7 @@ import os
 import io
 import json
 import torch
+import pickle
 import time
 import numpy as np
 from collections import defaultdict
@@ -42,11 +43,11 @@ class Yelp(Dataset):
         self.have_vocab = have_vocab
 
         self.raw_data_path = os.path.join(self.data_dir, 'yelp.'+split+'.csv')
-        self.preprocessed_data_file = 'yelp.'+split+'.json'
+        self.preprocessed_data_file = 'yelp.'+split+'.pl'
         self.vocab_file = 'yelp.vocab.json'
          
          # load bow vocab
-        with open("./data/yelp/bow.json") as f:
+        with open("./bow.json") as f:
             self.bow_filtered_vocab_indices = json.load(f)
 
 
@@ -75,7 +76,7 @@ class Yelp(Dataset):
         return {
             'input': np.asarray(self.data[idx]['input']),
             'target': np.asarray(self.data[idx]['target']),
-            'target': np.asarray(self.data[idx]['bow']),
+            'bow': self._get_bow_representations(self.data[idx]['input']),
             'label': np.asarray(self.data[idx]['label']),
             'length': self.data[idx]['length']
         }
@@ -117,6 +118,17 @@ class Yelp(Dataset):
                 vocab = json.load(file)
             self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
 
+    def _load_data_2(self, vocab=True):
+
+        print("loading preprocessed pickle data...")
+
+        with open(os.path.join(self.data_dir, self.preprocessed_data_file), 'rb') as file:
+            self.data = pickle.load(file)
+        if vocab:
+            with open(os.path.join(self.data_dir, self.vocab_file), 'rb') as file:
+                vocab = pickle.load(file)
+            self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
+
     def _load_vocab(self):
         with open(os.path.join(self.data_dir, self.vocab_file), 'r') as vocab_file:
             vocab = json.load(vocab_file)
@@ -154,13 +166,7 @@ class Yelp(Dataset):
 
                 target = words[:self.max_sequence_length-1]
                 target = target + ['<eos>']
-
-                #get content bow of sentence
-                bow_emdedding = self._get_bow_representations(target)
-
-                # print(bow_emdedding.shape)
-
-                # exit()
+        
 
                 assert len(input) == len(target), "%i, %i" % (len(input), len(target))
 
@@ -176,14 +182,17 @@ class Yelp(Dataset):
                 data[id]['input'] = input
                 data[id]['label'] = label
                 data[id]['target'] = target
-                data[id]['bow'] = bow_emdedding.tolist()
                 data[id]['length'] = length
 
-                del bow_emdedding
+                # we get batch['bow'] in get_item() instead as bow is too expensive to store
 
         with io.open(os.path.join(self.data_dir, self.preprocessed_data_file), 'wb') as preprocessed_data_file:
             data = json.dumps(data, ensure_ascii=False)
             preprocessed_data_file.write(data.encode('utf8', 'replace'))
+
+            # using pickle instead of json
+            # pickle.dump(data, preprocessed_data_file)
+            # preprocessed_data_file.close()
 
         self._load_data(vocab=False)
 
