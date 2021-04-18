@@ -108,12 +108,7 @@ def convert_sentences_to_latent(args):
     # print('-------INTERPOLATION-------')
     # print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
 
-    print("here")
 
-
-
-    pass
-    
 
 if __name__ == "__main__":
     

@@ -18,7 +18,7 @@ from tqdm import tqdm
 
 from model2 import SentenceVAE2
 from yelpd import Yelpd         
-
+from utils import idx2word
 import argparse
 
 
@@ -155,23 +155,30 @@ def main(args):
                         batch[k] = to_var(v)
 
                 # Forward pass
-                logp, mean, logv, z, style_mul_loss, content_mul_loss = model(batch['input'], batch['length'], batch['label'], batch['bow'])
+                logp, mean, logv, z, style_mul_loss, content_mul_loss, style_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
+
+                # print results
+                i2w = datasets['train'].get_i2w()
+                w2i = datasets['train'].get_w2i()
+                # print(batch['input'][0])
+                print(idx2word(batch['input'], i2w=i2w, pad_idx=w2i['<pad>']))
+                print("neg: {}, pos: {}".format(style_preds[0,0], style_preds[0,1]))
 
                 # loss calculation
                 NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
 
 
                 # final loss calculation
-                loss = (NLL_loss + KL_weight * KL_loss) / batch_size
-                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
+                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
                     # loss.backward()  # run bp
-                    loss.backward(retain_graph=True)  # run bp
-                    style_mul_loss.backward(retain_graph=True) 
-                    content_mul_loss.backward()
+                    loss.backward()  # run bp
+                    # style_mul_loss.backward() 
+                    # content_mul_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
 

@@ -52,7 +52,10 @@ class SentenceVAE2(nn.Module):
 
         # classifiers
         self.content_classifier = nn.Linear(int(3*latent_size/4), self.content_bow_dim)
-        self.style_classifier = nn.Linear(int(latent_size/4), 2) # for correlating style space to sentiment
+        self.style_classifier_1 = nn.Linear(int(latent_size/4), 10) # for correlating style space to sentiment
+        self.style_classifier_2 = nn.Linear(10, 2) # for correlating style space to sentiment
+
+        self.style_sigmoid = nn.ReLU()
 
         # dsicrimimnator/adversaries
 
@@ -64,7 +67,6 @@ class SentenceVAE2(nn.Module):
 
         #extra parameters for style disentg.
         
-
         self.label_smoothing = 0.1
         self.num_style = 2
         self.dropout_rate = 0.5
@@ -121,7 +123,8 @@ class SentenceVAE2(nn.Module):
         final_z = torch.cat((style_z, content_z), dim=1)
 
         #style and content classifiers
-        style_mul_loss = self.get_style_mul_loss(style_z, labels, batch_size)
+        
+        style_mul_loss, style_preds = self.get_style_mul_loss(style_z, labels, batch_size)
         content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
 
         # DECODER
@@ -163,7 +166,7 @@ class SentenceVAE2(nn.Module):
         logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
         logp = logp.view(b, s, self.embedding.num_embeddings)
 
-        return logp, final_mean, final_logv, final_z, style_mul_loss, content_mul_loss
+        return logp, final_mean, final_logv, final_z, style_mul_loss, content_mul_loss, style_preds
 
     def get_style_mul_loss(self, style_z, labels, batch_size):
         """
@@ -174,19 +177,39 @@ class SentenceVAE2(nn.Module):
         """
         # predictions
     
-        preds = nn.Softmax(dim=1)(self.style_classifier(self.dropout(style_z)))
+        preds = self.style_classifier_1(style_z)
+        preds = self.style_classifier_2(preds)
+        preds = self.style_sigmoid(preds)
+        # print(preds[0])
+        
+        preds = nn.Softmax(dim=1)(preds)
+
+        # print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
+
+        # preds = torch.ones(32, 1).cuda()
+        # preds_2 = torch.zeros(32, 1).cuda()
+        # preds = torch.cat((preds, preds_2), dim=1)
+        # print(preds.shape)
+        # exit()
+
+
+        # test = self.style_classifier(style_z)
+        # print(test.shape)
+        # exit()
+        # preds = nn.Sigmoid(test)
         
         # label smoothing
-        smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
+        # smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
     
-        preds_max = torch.ones(batch_size, 1).cuda() - preds[:, 0] #only choose the label with the larger prob
+        # preds_max = torch.ones(batch_size, 1).cuda() - preds[:, 0] #only choose the label with the larger prob
         
         # calculate cross entropy loss
         
-        # print(labels.shape)
+        # print(labels[0])
+        # print(preds[0])
         style_mul_loss = nn.BCELoss()(preds, labels.type(torch.FloatTensor).cuda())
 
-        return style_mul_loss
+        return style_mul_loss, preds
 
     def get_content_mul_loss(self, content_emb, content_bow):
         """
@@ -197,7 +220,7 @@ class SentenceVAE2(nn.Module):
         """
         # predictions
         preds = nn.Softmax(dim=1)(self.content_classifier(self.dropout(content_emb)))
-        print(content_bow[0])
+        # print(content_bow[0])
         
         # label smoothing
         smoothed_content_bow = content_bow * (1-self.label_smoothing) + self.label_smoothing/self.content_bow_dim

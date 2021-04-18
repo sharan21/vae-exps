@@ -155,7 +155,7 @@ class Yelpd(Dataset):
                     break
 
                 # separate the label and the line
-                label = float(line[1])
+                label = float(line[1])-1
                 line = line[4:]
 
                 words = tokenizer.tokenize(line)
