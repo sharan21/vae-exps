@@ -30,6 +30,8 @@ class Yelp(Dataset):
         self.save_model_path = "./bin"
         self.split = split
 
+        self.bow_hidden_dim = 7526
+
         # self.max_sequence_length = 1165
         self.max_sequence_length = 116
         self.min_occ = kwargs.get('min_occ', 3)
@@ -42,6 +44,11 @@ class Yelp(Dataset):
         self.raw_data_path = os.path.join(self.data_dir, 'yelp.'+split+'.csv')
         self.preprocessed_data_file = 'yelp.'+split+'.json'
         self.vocab_file = 'yelp.vocab.json'
+         
+         # load bow vocab
+        with open("./data/yelp/bow.json") as f:
+            self.bow_filtered_vocab_indices = json.load(f)
+
 
         if create_data:
             print("Creating new %s ptb data." % split.upper())
@@ -55,6 +62,9 @@ class Yelp(Dataset):
         else:
             print(" found preprocessed files, no need tooo create data!")
             self._load_data()
+        
+       
+        
 
     def __len__(self):
         return len(self.data)
@@ -65,6 +75,7 @@ class Yelp(Dataset):
         return {
             'input': np.asarray(self.data[idx]['input']),
             'target': np.asarray(self.data[idx]['target']),
+            'target': np.asarray(self.data[idx]['bow']),
             'label': np.asarray(self.data[idx]['label']),
             'length': self.data[idx]['length']
         }
@@ -136,7 +147,6 @@ class Yelp(Dataset):
                 label = float(line[1])
                 line = line[4:]
 
-                
                 words = tokenizer.tokenize(line)
 
                 input = ['<sos>'] + words
@@ -145,7 +155,15 @@ class Yelp(Dataset):
                 target = words[:self.max_sequence_length-1]
                 target = target + ['<eos>']
 
+                #get content bow of sentence
+                bow_emdedding = self._get_bow_representations(target)
+
+                # print(bow_emdedding.shape)
+
+                # exit()
+
                 assert len(input) == len(target), "%i, %i" % (len(input), len(target))
+
                 length = len(input)
 
                 input.extend(['<pad>'] * (self.max_sequence_length-length))
@@ -158,7 +176,10 @@ class Yelp(Dataset):
                 data[id]['input'] = input
                 data[id]['label'] = label
                 data[id]['target'] = target
+                data[id]['bow'] = bow_emdedding.tolist()
                 data[id]['length'] = length
+
+                del bow_emdedding
 
         with io.open(os.path.join(self.data_dir, self.preprocessed_data_file), 'wb') as preprocessed_data_file:
             data = json.dumps(data, ensure_ascii=False)
@@ -254,3 +275,21 @@ class Yelp(Dataset):
             preprocessed_data_file.write(data.encode('utf8', 'replace'))
 
         self._load_data(vocab=False)
+    
+    def _get_bow_representations(self, text_sequence):
+        """
+        Returns BOW representation of every sequence of the batch
+        """
+
+        sequence_bow_representation = np.zeros(shape=self.bow_hidden_dim, dtype=np.float32)
+        
+        # Iterate over each word in the sequence
+        for index in text_sequence:
+
+            if index in self.bow_filtered_vocab_indices:
+                bow_index = self.bow_filtered_vocab_indices[index]
+                sequence_bow_representation[bow_index] += 1
+        
+        sequence_bow_representation /= np.max([np.sum(sequence_bow_representation), 1])
+
+        return np.asarray(sequence_bow_representation)

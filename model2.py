@@ -69,7 +69,7 @@ class SentenceVAE2(nn.Module):
 
         self.dropout = nn.Dropout(self.dropout_rate)
 
-    def forward(self, input_sequence, length, labels):
+    def forward(self, input_sequence, length, labels, content_bow):
 
         batch_size = input_sequence.size(0) #get batch size
         sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
@@ -120,6 +120,7 @@ class SentenceVAE2(nn.Module):
 
         #style and content classifiers
         style_mul_loss = self.get_style_mul_loss(style_z, labels, batch_size)
+        content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
 
         # DECODER
         hidden = self.latent2hidden(final_z)
@@ -191,12 +192,10 @@ class SentenceVAE2(nn.Module):
         cross entropy loss of the content classifier
         """
         # predictions
-        preds = nn.Softmax(dim=1)(
-            self.content_classifier(self.dropout(content_emb)))
+        preds = nn.Softmax(dim=1)(self.content_classifier(self.dropout(content_emb)))
+        
         # label smoothing
-        smoothed_content_bow = content_bow * \
-            (1-mconfig.label_smoothing) + \
-            mconfig.label_smoothing/mconfig.content_bow_dim
+        smoothed_content_bow = content_bow * (1-mconfig.label_smoothing) + mconfig.label_smoothing/mconfig.content_bow_dim
         # calculate cross entropy loss
         content_mul_loss = nn.BCELoss()(preds, smoothed_content_bow)
 
