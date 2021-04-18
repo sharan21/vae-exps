@@ -163,7 +163,7 @@ class SentenceVAE2(nn.Module):
         logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
         logp = logp.view(b, s, self.embedding.num_embeddings)
 
-        return logp, final_mean, final_logv, final_z
+        return logp, final_mean, final_logv, final_z, style_mul_loss, content_mul_loss
 
     def get_style_mul_loss(self, style_z, labels, batch_size):
         """

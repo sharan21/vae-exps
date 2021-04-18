@@ -155,14 +155,15 @@ def main(args):
                         batch[k] = to_var(v)
 
                 # Forward pass
-                logp, mean, logv, z = model(batch['input'], batch['length'], batch['label'], batch['bow'])
+                logp, mean, logv, z, style_mul_loss, content_mul_loss = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # loss calculation
-                NLL_loss, KL_loss, KL_weight = loss_fn(
-                    logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
+                NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
+
 
                 # final loss calculation
-                loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
 
                 # backward + optimization
                 if split == 'train':
@@ -184,12 +185,17 @@ def main(args):
                                       epoch*len(data_loader) + iteration)
                     writer.add_scalar("%s/KL Weight" % split.upper(), KL_weight,
                                       epoch*len(data_loader) + iteration)
+                                      
 
                 #
                 if iteration % args.print_every == 0 or iteration+1 == len(data_loader):
-                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f"
+                    # print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f"
+                    #       % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
+                    #          KL_loss.item()/batch_size, KL_weight))
+
+                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f"
                           % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
-                             KL_loss.item()/batch_size, KL_weight))
+                             KL_loss.item()/batch_size, KL_weight, style_mul_loss))
 
                 if split == 'valid':
                     if 'target_sents' not in tracker:
