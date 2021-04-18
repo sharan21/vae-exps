@@ -197,6 +197,7 @@ class SentenceVAE2(nn.Module):
         """
         # predictions
         preds = nn.Softmax(dim=1)(self.content_classifier(self.dropout(content_emb)))
+        print(content_bow[0])
         
         # label smoothing
         smoothed_content_bow = content_bow * (1-self.label_smoothing) + self.label_smoothing/self.content_bow_dim

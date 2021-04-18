@@ -17,7 +17,7 @@ from utils import OrderedCounter
 from tqdm import tqdm
 
 from model import SentenceVAE
-from yelp import Yelp
+from yelpd import Yelpd
 
 import argparse
 
@@ -38,7 +38,7 @@ def main(args):
     # create test and train split in data, also preprocess
     for split in splits:
         print("creating dataset for: {}".format(split))
-        datasets[split] = Yelp(
+        datasets[split] = Yelpd(
             split=split,
             create_data=args.create_data,
             min_occ=args.min_occ

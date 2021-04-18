@@ -7,3 +7,4 @@ figs
 simple-examples
 simple-examples.tgz
 .DS_Store
+*.pyc

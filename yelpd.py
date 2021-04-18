@@ -64,9 +64,7 @@ class Yelpd(Dataset):
             print(" found preprocessed files, no need tooo create data!")
             self._load_data()
         
-       
-        
-
+    
     def __len__(self):
         return len(self.data)
 
@@ -78,7 +76,7 @@ class Yelpd(Dataset):
             'target': np.asarray(self.data[idx]['target']),
             'bow': self._get_bow_representations(self.data[idx]['input']),
             # 'label': np.asarray(self.data[idx]['label']),
-            'label': np.asarray([1-self.data[idx]['label'], self.data[idx]['label']]),
+            'label': np.asarray([1-self.data[idx]['label'], self.data[idx]['label']]), # we need to make it 2 dim to match predicted label dim.
             'length': self.data[idx]['length']
         }
 
