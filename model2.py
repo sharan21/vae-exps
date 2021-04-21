@@ -88,8 +88,7 @@ class SentenceVAE2(nn.Module):
 
         # if the RNN has multiple layers, flatten all the hiddens states 
         if self.bidirectional or self.num_layers > 1:
-            # flatten hidden state
-            hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor)
+            hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
         else:
             hidden = hidden.squeeze()
 
@@ -180,33 +179,13 @@ class SentenceVAE2(nn.Module):
         preds = self.style_classifier_1(style_z)
         preds = self.style_classifier_2(preds)
         preds = self.style_sigmoid(preds)
-        # print(preds[0])
-        
         preds = nn.Softmax(dim=1)(preds)
-
-        # print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
-
-        # preds = torch.ones(32, 1).cuda()
-        # preds_2 = torch.zeros(32, 1).cuda()
-        # preds = torch.cat((preds, preds_2), dim=1)
-        # print(preds.shape)
-        # exit()
-
-
-        # test = self.style_classifier(style_z)
-        # print(test.shape)
-        # exit()
-        # preds = nn.Sigmoid(test)
         
         # label smoothing
         # smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
     
-        # preds_max = torch.ones(batch_size, 1).cuda() - preds[:, 0] #only choose the label with the larger prob
-        
         # calculate cross entropy loss
         
-        # print(labels[0])
-        # print(preds[0])
         style_mul_loss = nn.BCELoss()(preds, labels.type(torch.FloatTensor).cuda())
 
         return style_mul_loss, preds

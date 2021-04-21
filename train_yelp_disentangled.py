@@ -158,26 +158,26 @@ def main(args):
                 logp, mean, logv, z, style_mul_loss, content_mul_loss, style_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # print results
-                i2w = datasets['train'].get_i2w()
-                w2i = datasets['train'].get_w2i()
-                # print(batch['input'][0])
-                print(idx2word(batch['input'], i2w=i2w, pad_idx=w2i['<pad>']))
-                print("neg: {}, pos: {}".format(style_preds[0,0], style_preds[0,1]))
+                # i2w = datasets['train'].get_i2w()
+                # w2i = datasets['train'].get_w2i()
+                
+                # print(idx2word(batch['input'], i2w=i2w, pad_idx=w2i['<pad>']))
+                # print("neg: {}, pos: {}".format(style_preds[0,0], style_preds[0,1]))
 
                 # loss calculation
                 NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
 
 
                 # final loss calculation
-                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size
-                loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
+                loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
                     # loss.backward()  # run bp
-                    loss.backward()  # run bp
-                    # style_mul_loss.backward() 
+                    # loss.backward()  # run bp
+                    style_mul_loss.backward() 
                     # content_mul_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
@@ -259,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('-hs', '--hidden_size', type=int, default=256)
     parser.add_argument('-nl', '--num_layers', type=int, default=1)
     parser.add_argument('-bi', '--bidirectional', action='store_true')
-    parser.add_argument('-ls', '--latent_size', type=int, default=16)
+    parser.add_argument('-ls', '--latent_size', type=int, default=40)
     parser.add_argument('-wd', '--word_dropout', type=float, default=0)
     parser.add_argument('-ed', '--embedding_dropout', type=float, default=0.5)
 
