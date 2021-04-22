@@ -4,7 +4,7 @@ import torch.nn.utils.rnn as rnn_utils
 from utils import to_var
 
 
-class SentenceVAE2(nn.Module):
+class SentenceVaeStyle(nn.Module):
     def __init__(self, vocab_size, embedding_size, rnn_type, hidden_size, word_dropout, embedding_dropout, latent_size,
                 sos_idx, eos_idx, pad_idx, unk_idx, max_sequence_length, num_layers=1, bidirectional=False):
 

@@ -10,13 +10,13 @@ from multiprocessing import cpu_count
 from utils import to_var, idx2word, expierment_name
 from torch.utils.data import DataLoader
 from nltk.tokenize import TweetTokenizer
-import torch.nn.functional as F
+
 from collections import OrderedDict, defaultdict
 
 from utils import OrderedCounter
 from tqdm import tqdm
 
-from YelpStyleTransf import SentenceVaeStyle
+from YelpStyleTransf import SentenceVaeStyleOrtho
 from yelpd import Yelpd         
 from utils import idx2word
 import argparse
@@ -63,7 +63,7 @@ def main(args):
     )
 
     # init model object
-    model = SentenceVaeStyle(**params)
+    model = SentenceVaeStyleOrtho(**params)
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -94,12 +94,8 @@ def main(args):
             return min(1, step/x0)
 
     # defining NLL loss to measure accuracy of the decoding
-    NLL = torch.nn.NLLLoss(
-        ignore_index=datasets['train'].pad_idx, reduction='sum')
+    NLL = torch.nn.NLLLoss(ignore_index=datasets['train'].pad_idx, reduction='sum')
 
-    # this loss function is used for the style classifier
-    loss_fn_2 = F.cross_entropy
-    
     # this functiom is used to compute the 2 loss terms and KL loss weight
     def loss_fn(logp, target, length, mean, logv, anneal_function, step, k, x0):
 
@@ -118,9 +114,7 @@ def main(args):
         return NLL_loss, KL_loss, KL_weight
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
-
     tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
-
     step = 0
 
     for epoch in range(args.epochs):
@@ -152,12 +146,13 @@ def main(args):
                 # get batch size
                 batch_size = batch['input'].size(0)
 
+
                 for k, v in batch.items():
                     if torch.is_tensor(v):
                         batch[k] = to_var(v)
 
                 # Forward pass
-                logp, mean, logv, z, style_mul_loss, content_mul_loss, style_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
+                style_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # print results
                 # i2w = datasets['train'].get_i2w()
@@ -167,12 +162,11 @@ def main(args):
                 # print("neg: {}, pos: {}".format(style_preds[0,0], style_preds[0,1]))
 
                 # loss calculation
-                NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
+                # NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
 
 
                 # final loss calculation
                 loss = (NLL_loss + KL_weight * KL_loss) / batch_size
-                loss_style = loss_fn_2(style_preds, target)
                 # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
 
                 # backward + optimization
@@ -180,7 +174,7 @@ def main(args):
                     optimizer.zero_grad()  # flush grads
                     loss.backward()  # run bp
                     # loss.backward()  # run bp
-                    loss_style.backward() 
+                    # style_mul_loss.backward() 
                     # content_mul_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
