@@ -15,8 +15,9 @@ from collections import OrderedDict, defaultdict
 
 from utils import OrderedCounter
 from tqdm import tqdm
+import torch.nn.functional as F
 
-from YelpStyleTransf import SentenceVaeStyleOrtho
+from YelpStyleTransfOrtho import SentenceVaeStyleOrtho
 from yelpd import Yelpd         
 from utils import idx2word
 import argparse
@@ -96,6 +97,8 @@ def main(args):
     # defining NLL loss to measure accuracy of the decoding
     NLL = torch.nn.NLLLoss(ignore_index=datasets['train'].pad_idx, reduction='sum')
 
+    loss_fn_2 = F.cross_entropy
+
     # this functiom is used to compute the 2 loss terms and KL loss weight
     def loss_fn(logp, target, length, mean, logv, anneal_function, step, k, x0):
 
@@ -166,14 +169,15 @@ def main(args):
 
 
                 # final loss calculation
-                loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                loss_style = loss_fn_2(style_preds, batch['label']) #classification loss
                 # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    loss.backward()  # run bp
                     # loss.backward()  # run bp
+                    loss_style.backward()  # run bp
                     # style_mul_loss.backward() 
                     # content_mul_loss.backward()
                     optimizer.step()  # run gd

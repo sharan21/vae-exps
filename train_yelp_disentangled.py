@@ -16,6 +16,8 @@ from collections import OrderedDict, defaultdict
 from utils import OrderedCounter
 from tqdm import tqdm
 
+import torch.nn as nn
+
 from YelpStyleTransf import SentenceVaeStyle
 from yelpd import Yelpd         
 from utils import idx2word
@@ -98,7 +100,7 @@ def main(args):
         ignore_index=datasets['train'].pad_idx, reduction='sum')
 
     # this loss function is used for the style classifier
-    loss_fn_2 = F.cross_entropy
+    loss_fn_2 = nn.MSELoss()
     
     # this functiom is used to compute the 2 loss terms and KL loss weight
     def loss_fn(logp, target, length, mean, logv, anneal_function, step, k, x0):
@@ -172,7 +174,13 @@ def main(args):
 
                 # final loss calculation
                 loss = (NLL_loss + KL_weight * KL_loss) / batch_size
-                loss_style = loss_fn_2(style_preds, target)
+                # print(type(batch['input']))
+                # exit()
+                # loss_style = loss_fn_2(style_preds, batch['label'].type(torch.LongTensor).cuda())
+                print(style_preds.dtype)
+                print(batch['label'].dtype)
+                # exit()
+                loss_style = loss_fn_2(style_preds, batch['label'])
                 # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
 
                 # backward + optimization
