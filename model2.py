@@ -154,6 +154,11 @@ class SentenceVAE2(nn.Module):
         # decoder forward pass
         outputs, _ = self.decoder_rnn(packed_input, hidden)
 
+        # print(type(outputs))
+        # print(outputs[0].shape)
+        # print(outputs[0][0, 0:10])
+        # exit()
+
         # process outputs
         padded_outputs = rnn_utils.pad_packed_sequence(outputs, batch_first=True)[0]
         padded_outputs = padded_outputs.contiguous()

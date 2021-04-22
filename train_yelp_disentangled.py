@@ -175,9 +175,9 @@ def main(args):
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
+                    loss.backward()  # run bp
                     # loss.backward()  # run bp
-                    # loss.backward()  # run bp
-                    style_mul_loss.backward() 
+                    # style_mul_loss.backward() 
                     # content_mul_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
@@ -250,7 +250,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=1)
+    parser.add_argument('-ep', '--epochs', type=int, default=20)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
