@@ -55,7 +55,7 @@ class SentenceVaeStyle(nn.Module):
         self.style_classifier_1 = nn.Linear(int(latent_size/4), 10) # for correlating style space to sentiment
         self.style_classifier_2 = nn.Linear(10, 2) # for correlating style space to sentiment
 
-        self.style_sigmoid = nn.ReLU()
+        self.style_activation = nn.ReLU()
 
         # dsicrimimnator/adversaries
 
@@ -154,11 +154,6 @@ class SentenceVaeStyle(nn.Module):
         # decoder forward pass
         outputs, _ = self.decoder_rnn(packed_input, hidden)
 
-        # print(type(outputs))
-        # print(outputs[0].shape)
-        # print(outputs[0][0, 0:10])
-        # exit()
-
         # process outputs
         padded_outputs = rnn_utils.pad_packed_sequence(outputs, batch_first=True)[0]
         padded_outputs = padded_outputs.contiguous()
@@ -183,14 +178,13 @@ class SentenceVaeStyle(nn.Module):
     
         preds = self.style_classifier_1(style_z)
         preds = self.style_classifier_2(preds)
-        preds = self.style_sigmoid(preds)
+        preds = self.style_activation(preds)
         preds = nn.Softmax(dim=1)(preds)
         
         # label smoothing
-        # smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
+        smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
     
         # calculate cross entropy loss
-        
         style_mul_loss = nn.BCELoss()(preds, labels.type(torch.FloatTensor).cuda())
 
         return style_mul_loss, preds
@@ -247,13 +241,9 @@ class SentenceVaeStyle(nn.Module):
                 input_sequence = to_var(torch.Tensor(batch_size).fill_(self.sos_idx).long())
 
             input_sequence = input_sequence.unsqueeze(1)
-
             input_embedding = self.embedding(input_sequence)
-
             output, hidden = self.decoder_rnn(input_embedding, hidden)
-
             logits = self.outputs2vocab(output)
-
             input_sequence = self._sample(logits)
 
             # save next input

@@ -94,7 +94,8 @@ class SentenceVaeStyleOrtho(nn.Module):
 		input_embedding = input_embedding.permute(1, 0, 2) # input.size() = (num_sequences, batch_size, embedding_length)
 
 		h_0 = Variable(torch.zeros(1, batch_size, self.hidden_size).cuda())
-		c_0 = Variable(torch.zeros(1, batch_size, self.hidden_size).cuda())
+		c_0 = Variable(t
+		orch.zeros(1, batch_size, self.hidden_size).cuda())
 
 		output, (hidden, final_cell_state) = self.lstm(input_embedding, (h_0, c_0))
 		style_preds = self.label(hidden[-1]) # final_hidden_state.size() = (1, batch_size, hidden_size) & final_output.size() = (batch_size, output_size)

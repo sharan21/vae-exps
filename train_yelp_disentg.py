@@ -18,7 +18,7 @@ from tqdm import tqdm
 
 import torch.nn as nn
 
-from YelpStyleTransf import SentenceVaeStyle
+from model_yelp_disentg import SentenceVaeStyle
 from yelpd import Yelpd         
 from utils import idx2word
 import argparse
@@ -164,7 +164,6 @@ def main(args):
                 # print results
                 # i2w = datasets['train'].get_i2w()
                 # w2i = datasets['train'].get_w2i()
-                
                 # print(idx2word(batch['input'], i2w=i2w, pad_idx=w2i['<pad>']))
                 # print("neg: {}, pos: {}".format(style_preds[0,0], style_preds[0,1]))
 
@@ -174,22 +173,16 @@ def main(args):
 
                 # final loss calculation
                 loss = (NLL_loss + KL_weight * KL_loss) / batch_size
-                # print(type(batch['input']))
-                # exit()
-                # loss_style = loss_fn_2(style_preds, batch['label'].type(torch.LongTensor).cuda())
-                print(style_preds.dtype)
-                print(batch['label'].dtype)
-                # exit()
-                loss_style = loss_fn_2(style_preds, batch['label'])
                 # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
+                # loss_style = loss_fn_2(style_preds, batch['label'])
+        
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    loss.backward()  # run bp
-                    # loss.backward()  # run bp
-                    loss_style.backward() 
-                    # content_mul_loss.backward()
+                    loss.backward(retain_graph=True)  # run bp for ae
+                    style_mul_loss.backward() # run bp for style classfier
+                    # content_mul_loss.backward() # run bp for content classifier
                     optimizer.step()  # run gd
                     step += 1
 

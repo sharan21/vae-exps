@@ -17,7 +17,7 @@ from collections import OrderedDict, defaultdict
 from utils import OrderedCounter
 from tqdm import tqdm
 
-from model import SentenceVAE
+# from model import SentenceVAE
 
 import argparse
 
