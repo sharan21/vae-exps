@@ -73,6 +73,10 @@ def main(args):
     # logging
     print(model)
 
+    # get dictionaries
+    i2w = datasets['train'].get_i2w()
+    w2i = datasets['train'].get_w2i()
+
     if args.tensorboard_logging:
         writer = SummaryWriter(os.path.join(args.logdir, expierment_name(args, ts)))
         writer.add_text("model", str(model))
@@ -156,68 +160,52 @@ def main(args):
                         batch[k] = to_var(v)
 
                 # Forward pass
-                style_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
+                logp, final_mean, final_logv, final_z, content_mul_loss, style_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # print results
-                # i2w = datasets['train'].get_i2w()
-                # w2i = datasets['train'].get_w2i()
-                
                 # print(idx2word(batch['input'], i2w=i2w, pad_idx=w2i['<pad>']))
                 # print("neg: {}, pos: {}".format(style_preds[0,0], style_preds[0,1]))
 
-                # loss calculation
-                # NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
-                # NLL_loss = 0
-                # KL_loss = 0
+                # nll and kl loss calculation
+                NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], final_mean, final_logv, args.anneal_function, step, args.k, args.x0)
 
+                # style classifier loss
+                style_classifier_loss = nn.MSELoss()(style_preds, batch['label'].type(torch.FloatTensor).cuda()) #classification loss
 
                 # final loss calculation
-                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size
-                # 
-                
-                loss = nn.MSELoss()(style_preds, batch['label'].type(torch.FloatTensor).cuda()) #classification loss
-                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
+                # vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size + style_classifier_loss*1000
+                vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    # loss.backward()  # run bp
-                    loss.backward()  # run bp
-                    
-                    # style_mul_loss.backward() 
+                    # vae_loss.backward()  # run bp
+                    style_classifier_loss.backward()  # run bp
                     # content_mul_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
 
                 # bookkeepeing
-                tracker['ELBO'] = torch.cat((tracker['ELBO'], loss.data.view(1, -1)), dim=0)
+                tracker['ELBO'] = torch.cat((tracker['ELBO'], vae_loss.data.view(1, -1)), dim=0)
 
                 # logging of losses
-                if args.tensorboard_logging:
-                    writer.add_scalar(
-                        "%s/ELBO" % split.upper(), loss.item(), epoch*len(data_loader) + iteration)
-                    writer.add_scalar("%s/NLL Loss" % split.upper(), NLL_loss.item() / batch_size,
-                                      epoch*len(data_loader) + iteration)
-                    writer.add_scalar("%s/KL Loss" % split.upper(), KL_loss.item() / batch_size,
-                                      epoch*len(data_loader) + iteration)
-                    writer.add_scalar("%s/KL Weight" % split.upper(), KL_weight,
-                                      epoch*len(data_loader) + iteration)
+                # if args.tensorboard_logging:
+                #     writer.add_scalar(
+                #         "%s/ELBO" % split.upper(), loss.item(), epoch*len(data_loader) + iteration)
+                #     writer.add_scalar("%s/NLL Loss" % split.upper(), NLL_loss.item() / batch_size,
+                #                       epoch*len(data_loader) + iteration)
+                #     writer.add_scalar("%s/KL Loss" % split.upper(), KL_loss.item() / batch_size,
+                #                       epoch*len(data_loader) + iteration)
+                #     writer.add_scalar("%s/KL Weight" % split.upper(), KL_weight,
+                #                       epoch*len(data_loader) + iteration)
                                       
 
-                #
+                
                 if iteration % args.print_every == 0 or iteration+1 == len(data_loader):
-                    # print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f"
-                    #       % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
-                    #          KL_loss.item()/batch_size, KL_weight))
-
-                    # print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f"
-                    #       % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
-                    #          KL_loss.item()/batch_size, KL_weight, style_mul_loss, content_mul_loss))
-                    
                     print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f"
-                          % (split.upper(), iteration, len(data_loader)-1, loss.item(), 0,
-                             0, 0, 0, 0))
-
+                          % (split.upper(), iteration, len(data_loader)-1, vae_loss.item(), NLL_loss.item()/batch_size,
+                             KL_loss.item()/batch_size, KL_weight, style_classifier_loss, content_mul_loss))
+                    
                 if split == 'valid':
                     if 'target_sents' not in tracker:
                         tracker['target_sents'] = list()
@@ -229,10 +217,6 @@ def main(args):
                   (split.upper(), epoch, args.epochs, tracker['ELBO'].mean()))
             
             # try sample
-            print(style_preds[0])
-            # print results
-            i2w = datasets['train'].get_i2w()
-            w2i = datasets['train'].get_w2i()
             print(idx2word(batch['input'][0:1], i2w=i2w, pad_idx=w2i['<pad>']))
             print("neg: {}, pos: {}".format(style_preds[0:1,0], style_preds[0:1,1]))
 

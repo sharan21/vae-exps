@@ -31,8 +31,8 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.output_size = 2
 
 		self.embedding = nn.Embedding(vocab_size, embedding_size)
-		# self.word_dropout_rate = word_dropout
-		# self.embedding_dropout = nn.Dropout(p=embedding_dropout)
+		self.word_dropout_rate = word_dropout
+		self.embedding_dropout = nn.Dropout(p=embedding_dropout)
 
 		if rnn_type == 'rnn':
 			rnn = nn.RNN
@@ -48,7 +48,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 
 		self.hidden_factor = (2 if bidirectional else 1) * num_layers
 		
-		self.label = nn.Linear(hidden_size, self.output_size)
+		# self.label = nn.Linear(hidden_size, self.output_size)
 
 
 		#####################################################################################
@@ -63,8 +63,8 @@ class SentenceVaeStyleOrtho(nn.Module):
 
 		# classifiers
 		self.content_classifier = nn.Linear(int(3*latent_size/4), self.content_bow_dim)
-		self.style_classifier_1 = nn.Linear(int(latent_size/4), 10) # for correlating style space to sentiment
-		self.style_classifier_2 = nn.Linear(10, 2) # for correlating style space to sentiment
+		self.style_classifier_1 = nn.Linear(int(latent_size/4), self.output_size) # for correlating style space to sentiment
+		# self.style_classifier_2 = nn.Linear(10, 2) # for correlating style space to sentiment
 
 		self.style_sigmoid = nn.ReLU()
 
@@ -87,7 +87,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 	def forward(self, input_sequence, length, labels, content_bow):
 
 		batch_size = input_sequence.size(0) #get batch size
-		# sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
+		sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
 		# input_sequence = input_sequence[sorted_idx] #get sorted sentences
 
 		input_embedding = self.embedding(input_sequence) # convert to embeddings
@@ -96,120 +96,18 @@ class SentenceVaeStyleOrtho(nn.Module):
 		h_0 = Variable(torch.zeros(1, batch_size, self.hidden_size).cuda())
 		c_0 = Variable(torch.zeros(1, batch_size, self.hidden_size).cuda())
 
-		output, (hidden, final_cell_state) = self.lstm(input_embedding, (h_0, c_0))
-		style_preds = self.label(hidden[-1]) # final_hidden_state.size() = (1, batch_size, hidden_size) & final_output.size() = (batch_size, output_size)
-
 		#pad inputs to uniform length
 		# packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True) #(B, L, E)
+
+		# run encoder
+		output, (hidden, final_cell_state) = self.lstm(input_embedding, (h_0, c_0))
+		hidden = hidden[-1] # take the last hidden state of lstm
 
 		# _, hidden = self.encoder_rnn(packed_input) # hidden -> (B, H)
 
 		# if the RNN has multiple layers, flatten all the hiddens states 
-		# if self.bidirectional or self.num_layers > 1:
-		#     hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
-		# else:
-			# hidden = hidden.squeeze()
-
-		
-		#encoder RNN done, hidden now contains the final hidden states to be mapped into prob dist.
-
-		# REPARAMETERIZATION of style and content
-
-		#style component
-
-		# style_mean = self.hidden2stylemean(hidden) #calc latent mean 
-		# style_logv = self.hidden2stylelogv(hidden) #calc latent variance
-		# style_std = torch.exp(0.5 * style_logv) #find sd
-
-		# style_z = to_var(torch.randn([batch_size, int(self.latent_size/4)])) #get a random vector
-		# style_z = style_z * style_std + style_mean #compute datapoint
-
-		#content component
-
-		# content_mean = self.hidden2contentmean(hidden) #calc latent mean 
-		# content_logv = self.hidden2contentlogv(hidden) #calc latent variance
-		# content_std = torch.exp(0.5 * content_logv) #find sd
-
-		# content_z = to_var(torch.randn([batch_size, int(3*self.latent_size/4)])) #get a random vector
-		# content_z = content_z * content_std + content_mean #compute datapoint
-
-		# # orthogonalise the 
-
-		# #concat style and concat
-
-		# final_mean = torch.cat((style_mean, content_mean), dim=1)
-		# final_logv = torch.cat((style_logv, content_logv), dim=1)
-		# final_z = torch.cat((style_z, content_z), dim=1)
-
-		# #style and content classifiers
-		
-		# style_mul_loss, style_preds = self.get_style_mul_loss(style_z, labels, batch_size)
-		# content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
-
-		# # DECODER
-		# hidden = self.latent2hidden(final_z)
-
-		# if self.bidirectional or self.num_layers > 1:
-		#     # unflatten hidden state
-		#     hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
-		# else:
-		#     hidden = hidden.unsqueeze(0)
-
-		# # decoder input
-		# if self.word_dropout_rate > 0:
-			
-		#     # randomly replace decoder input with <unk>
-		#     prob = torch.rand(input_sequence.size())
-			
-		#     if torch.cuda.is_available():
-		#         prob=prob.cuda()
-		#     prob[(input_sequence.data - self.sos_idx) * (input_sequence.data - self.pad_idx) == 0] = 1
-		#     decoder_input_sequence = input_sequence.clone()
-		#     decoder_input_sequence[prob < self.word_dropout_rate] = self.unk_idx
-		#     input_embedding = self.embedding(decoder_input_sequence)
-
-		# input_embedding = self.embedding_dropout(input_embedding)
-		# packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True)
-
-		# # decoder forward pass
-		# outputs, _ = self.decoder_rnn(packed_input, hidden)
-
-		# # print(type(outputs))
-		# # print(outputs[0].shape)
-		# # print(outputs[0][0, 0:10])
-		# # exit()
-
-		# # process outputs
-		# padded_outputs = rnn_utils.pad_packed_sequence(outputs, batch_first=True)[0]
-		# padded_outputs = padded_outputs.contiguous()
-		# _,reversed_idx = torch.sort(sorted_idx)
-		# padded_outputs = padded_outputs[reversed_idx]
-		# b,s,_ = padded_outputs.size()
-
-		# # project outputs to vocab
-		# logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
-		# logp = logp.view(b, s, self.embedding.num_embeddings)
-
-		# return logp, final_mean, final_logv, final_z, style_mul_loss, content_mul_loss, style_preds
-
-		return style_preds
-
-	def forward2(self, input_sequence, length, labels, content_bow):
-
-		batch_size = input_sequence.size(0) #get batch size
-		sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
-		input_sequence = input_sequence[sorted_idx] #get sorted sentences
-
-		input_embedding = self.embedding(input_sequence) # convert to embeddings
-
-		#pad inputs to uniform length
-		packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True) #(B, L, E)
-
-		_, hidden = self.encoder_rnn(packed_input) # hidden -> (B, H)
-
-		# if the RNN has multiple layers, flatten all the hiddens states 
 		if self.bidirectional or self.num_layers > 1:
-			hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
+		    hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
 		else:
 			hidden = hidden.squeeze()
 
@@ -236,51 +134,51 @@ class SentenceVaeStyleOrtho(nn.Module):
 		content_z = to_var(torch.randn([batch_size, int(3*self.latent_size/4)])) #get a random vector
 		content_z = content_z * content_std + content_mean #compute datapoint
 
-		# orthogonalise the 
 
-		#concat style and concat
+		# #concat style and concat
 
 		final_mean = torch.cat((style_mean, content_mean), dim=1)
 		final_logv = torch.cat((style_logv, content_logv), dim=1)
 		final_z = torch.cat((style_z, content_z), dim=1)
 
-		#style and content classifiers
+		# #style and content classifiers
+
+		# run style classifier on hidden space (proposal 1)
+		style_preds = self.style_classifier_1(style_z) # final_hidden_state.size() = (1, batch_size, hidden_size) & final_output.size() = (batch_size, output_size)
+
 		
-		style_mul_loss, style_preds = self.get_style_mul_loss(style_z, labels, batch_size)
+		# style_mul_loss, style_preds = self.get_style_mul_loss(style_z, labels, batch_size)
 		content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
 
-		# DECODER
+		# # DECODER
 		hidden = self.latent2hidden(final_z)
 
 		if self.bidirectional or self.num_layers > 1:
-			# unflatten hidden state
-			hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
+		    # unflatten hidden state
+		    hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
 		else:
-			hidden = hidden.unsqueeze(0)
+		    hidden = hidden.unsqueeze(0)
 
 		# decoder input
 		if self.word_dropout_rate > 0:
 			
-			# randomly replace decoder input with <unk>
-			prob = torch.rand(input_sequence.size())
+		    # randomly replace decoder input with <unk>
+		    prob = torch.rand(input_sequence.size())
 			
-			if torch.cuda.is_available():
-				prob=prob.cuda()
-			prob[(input_sequence.data - self.sos_idx) * (input_sequence.data - self.pad_idx) == 0] = 1
-			decoder_input_sequence = input_sequence.clone()
-			decoder_input_sequence[prob < self.word_dropout_rate] = self.unk_idx
-			input_embedding = self.embedding(decoder_input_sequence)
+		    if torch.cuda.is_available():
+		        prob=prob.cuda()
+		    prob[(input_sequence.data - self.sos_idx) * (input_sequence.data - self.pad_idx) == 0] = 1
+		    decoder_input_sequence = input_sequence.clone()
+		    decoder_input_sequence[prob < self.word_dropout_rate] = self.unk_idx
+		    input_embedding = self.embedding(decoder_input_sequence)
 
-		input_embedding = self.embedding_dropout(input_embedding)
+		# input_embedding = self.embedding_dropout(input_embedding)
+		input_embedding = input_embedding.permute(1, 0, 2) # input.size() = (num_sequences, batch_size, embedding_length)
 		packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True)
 
 		# decoder forward pass
+				
 		outputs, _ = self.decoder_rnn(packed_input, hidden)
-
-		# print(type(outputs))
-		# print(outputs[0].shape)
-		# print(outputs[0][0, 0:10])
-		# exit()
 
 		# process outputs
 		padded_outputs = rnn_utils.pad_packed_sequence(outputs, batch_first=True)[0]
@@ -293,31 +191,9 @@ class SentenceVaeStyleOrtho(nn.Module):
 		logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
 		logp = logp.view(b, s, self.embedding.num_embeddings)
 
-		return logp, final_mean, final_logv, final_z, style_mul_loss, content_mul_loss, style_preds
+		return logp, final_mean, final_logv, final_z, content_mul_loss, style_preds
 
-	def get_style_mul_loss(self, style_z, labels, batch_size):
-		"""
-		This loss quantifies the amount of style information preserved
-		in the style space
-		Returns:
-		cross entropy loss of the style classifier
-		"""
-		# predictions
-	
-		preds = self.style_classifier_1(style_z)
-		preds = self.style_classifier_2(preds)
-		preds = self.style_sigmoid(preds)
-		preds = nn.Softmax(dim=1)(preds)
 		
-		# label smoothing
-		# smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
-	
-		# calculate cross entropy loss
-		
-		style_mul_loss = nn.BCELoss()(preds, labels.type(torch.FloatTensor).cuda())
-
-		return style_mul_loss, preds
-
 	def get_content_mul_loss(self, content_emb, content_bow):
 		"""
 		This loss quantifies the amount of content information preserved
@@ -327,7 +203,6 @@ class SentenceVaeStyleOrtho(nn.Module):
 		"""
 		# predictions
 		preds = nn.Softmax(dim=1)(self.content_classifier(self.dropout(content_emb)))
-		# print(content_bow[0])
 		
 		# label smoothing
 		smoothed_content_bow = content_bow * (1-self.label_smoothing) + self.label_smoothing/self.content_bow_dim
@@ -370,13 +245,9 @@ class SentenceVaeStyleOrtho(nn.Module):
 				input_sequence = to_var(torch.Tensor(batch_size).fill_(self.sos_idx).long())
 
 			input_sequence = input_sequence.unsqueeze(1)
-
 			input_embedding = self.embedding(input_sequence)
-
 			output, hidden = self.decoder_rnn(input_embedding, hidden)
-
 			logits = self.outputs2vocab(output)
-
 			input_sequence = self._sample(logits)
 
 			# save next input
