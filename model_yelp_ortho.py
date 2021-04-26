@@ -107,7 +107,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 
 		# if the RNN has multiple layers, flatten all the hiddens states 
 		if self.bidirectional or self.num_layers > 1:
-		    hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
+			hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
 		else:
 			hidden = hidden.squeeze()
 
@@ -147,33 +147,32 @@ class SentenceVaeStyleOrtho(nn.Module):
 
 		# run style classifier on hidden space (proposal 1)
 		style_preds = self.style_classifier_1(style_z) # final_hidden_state.size() = (1, batch_size, hidden_size) & final_output.size() = (batch_size, output_size)
+		content_preds = self.content_classifier(content_z)
 
-		
 		# style_mul_loss, style_preds = self.get_style_mul_loss(style_z, labels, batch_size)
-		content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
-		print(content_bow[0:5][0:10])
+		# content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
 
 		# # DECODER
 		hidden = self.latent2hidden(final_z)
 
 		if self.bidirectional or self.num_layers > 1:
-		    # unflatten hidden state
-		    hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
+			# unflatten hidden state
+			hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
 		else:
-		    hidden = hidden.unsqueeze(0)
+			hidden = hidden.unsqueeze(0)
 
 		# decoder input
 		if self.word_dropout_rate > 0:
 			
-		    # randomly replace decoder input with <unk>
-		    prob = torch.rand(input_sequence.size())
+			# randomly replace decoder input with <unk>
+			prob = torch.rand(input_sequence.size())
 			
-		    if torch.cuda.is_available():
-		        prob=prob.cuda()
-		    prob[(input_sequence.data - self.sos_idx) * (input_sequence.data - self.pad_idx) == 0] = 1
-		    decoder_input_sequence = input_sequence.clone()
-		    decoder_input_sequence[prob < self.word_dropout_rate] = self.unk_idx
-		    input_embedding = self.embedding(decoder_input_sequence)
+			if torch.cuda.is_available():
+				prob=prob.cuda()
+			prob[(input_sequence.data - self.sos_idx) * (input_sequence.data - self.pad_idx) == 0] = 1
+			decoder_input_sequence = input_sequence.clone()
+			decoder_input_sequence[prob < self.word_dropout_rate] = self.unk_idx
+			input_embedding = self.embedding(decoder_input_sequence)
 
 		# input_embedding = self.embedding_dropout(input_embedding)
 		input_embedding = input_embedding.permute(1, 0, 2) # input.size() = (num_sequences, batch_size, embedding_length)
@@ -194,25 +193,8 @@ class SentenceVaeStyleOrtho(nn.Module):
 		logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
 		logp = logp.view(b, s, self.embedding.num_embeddings)
 
-		return logp, final_mean, final_logv, final_z, content_mul_loss, style_preds
+		return logp, final_mean, final_logv, final_z, style_preds, content_preds
 
-		
-	def get_content_mul_loss(self, content_emb, content_bow):
-		"""
-		This loss quantifies the amount of content information preserved
-		in the content space
-		Returns:
-		cross entropy loss of the content classifier
-		"""
-		# predictions
-		preds = nn.Softmax(dim=1)(self.content_classifier(self.dropout(content_emb)))
-		
-		# label smoothing
-		smoothed_content_bow = content_bow * (1-self.label_smoothing) + self.label_smoothing/self.content_bow_dim
-		# calculate cross entropy loss
-		content_mul_loss = nn.BCELoss()(preds, smoothed_content_bow)
-
-		return content_mul_loss
 
 	
 	def inference(self, n=4, z=None):

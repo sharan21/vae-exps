@@ -154,16 +154,13 @@ def main(args):
                 # get batch size
                 batch_size = batch['input'].size(0)
 
-
                 for k, v in batch.items():
                     if torch.is_tensor(v):
                         batch[k] = to_var(v)
                     
-                # print(batch['bow'][0:2][0:5])
-                
-
+            
                 # Forward pass
-                logp, final_mean, final_logv, final_z, content_mul_loss, style_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
+                logp, final_mean, final_logv, final_z, style_preds, content_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # print results
                 # print(idx2word(batch['input'], i2w=i2w, pad_idx=w2i['<pad>']))
@@ -174,6 +171,7 @@ def main(args):
 
                 # style classifier loss
                 style_classifier_loss = nn.MSELoss()(style_preds, batch['label'].type(torch.FloatTensor).cuda()) #classification loss
+                content_classifier_loss = nn.MSELoss()(content_preds, batch['bow'].type(torch.FloatTensor).cuda()) #classification loss
 
                 # final loss calculation
                 vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size + style_classifier_loss*1000
@@ -182,9 +180,9 @@ def main(args):
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    vae_loss.backward()  # run bp
+                    # vae_loss.backward()  # run bp
                     # style_classifier_loss.backward()  # run bp
-                    # content_mul_loss.backward()
+                    content_classifier_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
 
@@ -207,7 +205,7 @@ def main(args):
                 if iteration % args.print_every == 0 or iteration+1 == len(data_loader):
                     print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f"
                           % (split.upper(), iteration, len(data_loader)-1, vae_loss.item(), NLL_loss.item()/batch_size,
-                             KL_loss.item()/batch_size, KL_weight, style_classifier_loss, content_mul_loss))
+                             KL_loss.item()/batch_size, KL_weight, style_classifier_loss, content_classifier_loss))
                     
                 if split == 'valid':
                     if 'target_sents' not in tracker:

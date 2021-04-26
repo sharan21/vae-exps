@@ -290,14 +290,15 @@ class Yelpd(Dataset):
         """
 
         sequence_bow_representation = np.zeros(shape=self.bow_hidden_dim, dtype=np.float32)
-        
+     
         # Iterate over each word in the sequence
         for index in text_sequence:
 
-            if index in self.bow_filtered_vocab_indices:
-                bow_index = self.bow_filtered_vocab_indices[index]
+            if str(index) in self.bow_filtered_vocab_indices:
+                bow_index = self.bow_filtered_vocab_indices[str(index)]
                 sequence_bow_representation[bow_index] += 1
         
+        # removing normalisation because the loss becomes too low with it, anyway it wont change correctness
         sequence_bow_representation /= np.max([np.sum(sequence_bow_representation), 1])
 
         return np.asarray(sequence_bow_representation)
