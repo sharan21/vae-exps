@@ -29,7 +29,7 @@ def main(args):
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
     ts = ts.replace(':', '-')
-    ts = ts+'-yelp-disentg'
+    ts = ts+'-yelp-ortho'
 
     # prepare dataset
     splits = ['train', 'test']
@@ -158,6 +158,9 @@ def main(args):
                 for k, v in batch.items():
                     if torch.is_tensor(v):
                         batch[k] = to_var(v)
+                    
+                # print(batch['bow'][0:2][0:5])
+                
 
                 # Forward pass
                 logp, final_mean, final_logv, final_z, content_mul_loss, style_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
@@ -173,19 +176,19 @@ def main(args):
                 style_classifier_loss = nn.MSELoss()(style_preds, batch['label'].type(torch.FloatTensor).cuda()) #classification loss
 
                 # final loss calculation
-                # vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size + style_classifier_loss*1000
-                vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size + style_classifier_loss*1000
+                # vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    # vae_loss.backward()  # run bp
-                    style_classifier_loss.backward()  # run bp
+                    vae_loss.backward()  # run bp
+                    # style_classifier_loss.backward()  # run bp
                     # content_mul_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
 
-                # bookkeepeing
+                # bookkeepeingcd
                 tracker['ELBO'] = torch.cat((tracker['ELBO'], vae_loss.data.view(1, -1)), dim=0)
 
                 # logging of losses
@@ -253,7 +256,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=20)
+    parser.add_argument('-ep', '--epochs', type=int, default=10)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 

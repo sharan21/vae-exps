@@ -123,7 +123,8 @@ class SentenceVaeStyleOrtho(nn.Module):
 		style_std = torch.exp(0.5 * style_logv) #find sd
 
 		style_z = to_var(torch.randn([batch_size, int(self.latent_size/4)])) #get a random vector
-		style_z = style_z * style_std + style_mean #compute datapoint
+		# style_z = style_z * style_std + style_mean #compute datapoint
+		style_z = style_z * torch.exp(style_logv) + style_mean #compute datapoint
 
 		#content component
 
@@ -132,7 +133,8 @@ class SentenceVaeStyleOrtho(nn.Module):
 		content_std = torch.exp(0.5 * content_logv) #find sd
 
 		content_z = to_var(torch.randn([batch_size, int(3*self.latent_size/4)])) #get a random vector
-		content_z = content_z * content_std + content_mean #compute datapoint
+		# content_z = content_z * content_std + content_mean #compute datapoint
+		content_z = content_z * torch.exp(content_logv) + content_mean #compute datapoint
 
 
 		# #concat style and concat
@@ -149,6 +151,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		
 		# style_mul_loss, style_preds = self.get_style_mul_loss(style_z, labels, batch_size)
 		content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
+		print(content_bow[0:5][0:10])
 
 		# # DECODER
 		hidden = self.latent2hidden(final_z)
