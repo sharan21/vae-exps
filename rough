@@ -23,7 +23,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.unk_idx = unk_idx
 
 		self.latent_size = latent_size
-		self.style_content_split = 0.75 # 
+		self.style_content_ratio = 0.75 # this 
 
 		self.rnn_type = rnn_type
 		# self.bidirectional = bidirectional # bidrectional doesnt work well
@@ -49,16 +49,16 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.hidden_factor = (2 if bidirectional else 1) * num_layers
 
 		######## hidden to style space ########
-		self.hidden2stylemean = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/4))
-		self.hidden2stylelogv = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/4))
+		self.hidden2stylemean = nn.Linear(hidden_size * self.hidden_factor, int((1-self.style_content_ratio) * latent_size))
+		self.hidden2stylelogv = nn.Linear(hidden_size * self.hidden_factor, int((1-self.style_content_ratio) * latent_size))
 
 		######### hidden to content space#######
-		self.hidden2contentmean = nn.Linear(hidden_size * self.hidden_factor, int(3*latent_size/4))
-		self.hidden2contentlogv = nn.Linear(hidden_size * self.hidden_factor, int(3*latent_size/4))
+		self.hidden2contentmean = nn.Linear(hidden_size * self.hidden_factor, int((self.style_content_ratio) * latent_size))
+		self.hidden2contentlogv = nn.Linear(hidden_size * self.hidden_factor, int((self.style_content_ratio) * latent_size))
 
 		########## classifiers ############
-		self.content_classifier = nn.Linear(int(3*latent_size/4), self.content_bow_dim)
-		self.style_classifier = nn.Linear(int(latent_size/4), self.output_size) # for correlating style space to sentiment
+		self.content_classifier = nn.Linear(int((1-self.style_content_ratio) * latent_size), self.content_bow_dim)
+		self.style_classifier = nn.Linear(int((self.style_content_ratio) * latent_size), self.output_size) # for correlating style space to sentiment
 		
 
 		############ adversaries ###########
@@ -114,9 +114,6 @@ class SentenceVaeStyleOrtho(nn.Module):
 
 		  ####### self attention
 		if(self.attention):
-			if(self.style_content_split != 0.5)
-				print("Cannot orthogonalise style and content embeddings of different dims!")
-				exit()
 			hidden = self.self_attention(output, hidden)
 		else:
 			hidden = hidden[-1] # take the last hidden state of lstm
@@ -136,7 +133,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		style_logv = self.hidden2stylelogv(hidden) #calc latent variance
 		style_std = torch.exp(0.5 * style_logv) #find sd
 
-		style_z = to_var(torch.randn([batch_size, int(self.latent_size/4)])) #get a random vector
+		style_z = to_var(torch.randn([batch_size, int((1-self.style_content_ratio) * self.latent_size)])) #get a random vector
 		# style_z = style_z * style_std + style_mean #compute datapoint
 		style_z = style_z * torch.exp(style_logv) + style_mean #compute datapoint
 
@@ -146,7 +143,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		content_logv = self.hidden2contentlogv(hidden) #calc latent variance
 		content_std = torch.exp(0.5 * content_logv) #find sd
 
-		content_z = to_var(torch.randn([batch_size, int(3*self.latent_size/4)])) #get a random vector
+		content_z = to_var(torch.randn([batch_size, int((self.style_content_ratio) * self.latent_size)])) #get a random vector
 		# content_z = content_z * content_std + content_mean #compute datapoint
 		content_z = content_z * torch.exp(content_logv) + content_mean #compute datapoint
 

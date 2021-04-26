@@ -63,7 +63,7 @@ def main(args):
         num_layers=args.num_layers,
         bidirectional=args.bidirectional,
         ortho=False,
-        attention=True
+        attention=False
     )
 
     # init model object
