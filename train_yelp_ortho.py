@@ -61,7 +61,9 @@ def main(args):
         embedding_dropout=args.embedding_dropout,
         latent_size=args.latent_size,
         num_layers=args.num_layers,
-        bidirectional=args.bidirectional
+        bidirectional=args.bidirectional,
+        ortho=False,
+        attention=True
     )
 
     # init model object
@@ -174,15 +176,15 @@ def main(args):
                 content_classifier_loss = nn.MSELoss()(content_preds, batch['bow'].type(torch.FloatTensor).cuda()) #classification loss
 
                 # final loss calculation
-                vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size + style_classifier_loss*1000
+                vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size + style_classifier_loss*1000 + content_classifier_loss*1000
                 # vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    # vae_loss.backward()  # run bp
+                    vae_loss.backward()  # run bp
                     # style_classifier_loss.backward()  # run bp
-                    content_classifier_loss.backward()
+                    # content_classifier_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
 
@@ -246,18 +248,14 @@ def main(args):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-
-    # parser.add_argument('--dataset', type=str, default='yelp')
-    # parser.add_argument('--data_dir', type=str, default='data')
+    
     parser.add_argument('--create_data', action='store_true')
-    # parser.add_argument('--max_sequence_length', type=int, default=116)
     parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
-
+    
     parser.add_argument('-ep', '--epochs', type=int, default=10)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
-
     parser.add_argument('-eb', '--embedding_size', type=int, default=300)
     parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')
     parser.add_argument('-hs', '--hidden_size', type=int, default=256)
@@ -266,15 +264,16 @@ if __name__ == '__main__':
     parser.add_argument('-ls', '--latent_size', type=int, default=40)
     parser.add_argument('-wd', '--word_dropout', type=float, default=0)
     parser.add_argument('-ed', '--embedding_dropout', type=float, default=0.5)
-
     parser.add_argument('-af', '--anneal_function', type=str, default='logistic')
     parser.add_argument('-k', '--k', type=float, default=0.0025)
     parser.add_argument('-x0', '--x0', type=int, default=2500)
+    # parser.add_argument('-attn', '--self_attention', ,action='store_false')
+    
 
     parser.add_argument('-v', '--print_every', type=int, default=50)
-    parser.add_argument('-tb', '--tensorboard_logging', action='store_true')
+    parser.add_argument('-tb', '--tensorboard_logging', action='store_true', default=False)
     parser.add_argument('-log', '--logdir', type=str, default='logs')
-    # parser.add_argument('-bin', '--save_model_path', type=str, default='bin')
+
 
     args = parser.parse_args()
 
