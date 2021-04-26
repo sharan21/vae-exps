@@ -16,8 +16,9 @@ from collections import OrderedDict, defaultdict
 from utils import OrderedCounter
 from tqdm import tqdm
 import torch.nn.functional as F
+import torch.nn as nn
 
-from YelpStyleTransfOrtho import SentenceVaeStyleOrtho
+from model_yelp_ortho import SentenceVaeStyleOrtho
 from yelpd import Yelpd         
 from utils import idx2word
 import argparse
@@ -166,18 +167,23 @@ def main(args):
 
                 # loss calculation
                 # NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
+                # NLL_loss = 0
+                # KL_loss = 0
 
 
                 # final loss calculation
                 # loss = (NLL_loss + KL_weight * KL_loss) / batch_size
-                loss_style = loss_fn_2(style_preds, batch['label']) #classification loss
+                # 
+                
+                loss = nn.MSELoss()(style_preds, batch['label'].type(torch.FloatTensor).cuda()) #classification loss
                 # loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 0.5 * style_mul_loss #added style CE term
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
                     # loss.backward()  # run bp
-                    loss_style.backward()  # run bp
+                    loss.backward()  # run bp
+                    print(style_preds[0])
                     # style_mul_loss.backward() 
                     # content_mul_loss.backward()
                     optimizer.step()  # run gd
@@ -204,9 +210,13 @@ def main(args):
                     #       % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
                     #          KL_loss.item()/batch_size, KL_weight))
 
+                    # print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f"
+                    #       % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
+                    #          KL_loss.item()/batch_size, KL_weight, style_mul_loss, content_mul_loss))
+                    
                     print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f"
-                          % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
-                             KL_loss.item()/batch_size, KL_weight, style_mul_loss, content_mul_loss))
+                          % (split.upper(), iteration, len(data_loader)-1, loss.item(), 0,
+                             0, 0, 0, 0))
 
                 if split == 'valid':
                     if 'target_sents' not in tracker:

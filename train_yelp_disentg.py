@@ -24,6 +24,13 @@ from utils import idx2word
 import argparse
 
 
+def clip_gradient(model, clip_value):
+    params = list(filter(lambda p: p.grad is not None, model.parameters()))
+    for p in params:
+        p.grad.data.clamp_(-clip_value, clip_value)
+
+
+
 def main(args):
 
     # create dir name
@@ -180,8 +187,14 @@ def main(args):
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    loss.backward(retain_graph=True)  # run bp for ae
+                    # loss.backward(retain_graph=True)  # run bp for ae
                     style_mul_loss.backward() # run bp for style classfier
+                    clip_gradient(model, 1e-1)
+                    
+                    # print(model.style_classifier_1.weight.grad)
+                    # print(model.style_classifier_1.bias)
+                    # print(style_preds[0])
+                    # print(style_mul_loss.shape)
                     # content_mul_loss.backward() # run bp for content classifier
                     optimizer.step()  # run gd
                     step += 1
@@ -256,7 +269,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-ep', '--epochs', type=int, default=20)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
+    parser.add_argument('-lr', '--learning_rate', type=float, default=0.00001)
 
     parser.add_argument('-eb', '--embedding_size', type=int, default=300)
     parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')

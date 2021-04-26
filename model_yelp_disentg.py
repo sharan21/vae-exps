@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
+import torch.nn.functional as F
 from utils import to_var
-
 
 class SentenceVaeStyle(nn.Module):
     def __init__(self, vocab_size, embedding_size, rnn_type, hidden_size, word_dropout, embedding_dropout, latent_size,
@@ -52,8 +52,9 @@ class SentenceVaeStyle(nn.Module):
 
         # classifiers
         self.content_classifier = nn.Linear(int(3*latent_size/4), self.content_bow_dim)
-        self.style_classifier_1 = nn.Linear(int(latent_size/4), 10) # for correlating style space to sentiment
-        self.style_classifier_2 = nn.Linear(10, 2) # for correlating style space to sentiment
+        # self.style_classifier_1 = nn.Linear(int(latent_size/4), 10) # for correlating style space to sentiment
+        self.style_classifier_1 = nn.Linear(hidden_size, 2) # for correlating style space to sentiment
+        # self.style_classifier_2 = nn.Linear(10, 2) # for correlating style space to sentiment
 
         self.style_activation = nn.ReLU()
 
@@ -85,6 +86,9 @@ class SentenceVaeStyle(nn.Module):
         packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True) #(B, L, E)
 
         _, hidden = self.encoder_rnn(packed_input) # hidden -> (B, H)
+
+        # print(hidden.shape)
+        # exit()
 
         # if the RNN has multiple layers, flatten all the hiddens states 
         if self.bidirectional or self.num_layers > 1:
@@ -123,8 +127,11 @@ class SentenceVaeStyle(nn.Module):
 
         #style and content classifiers
         
-        style_mul_loss, style_preds = self.get_style_mul_loss(style_z, labels, batch_size)
-        content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
+        style_mul_loss, style_preds = self.get_style_mul_loss(hidden, labels, batch_size)
+        # content_mul_loss = self.get_content_mul_loss(content_z, content_bow)
+        content_mul_loss = 0
+
+        # print(style_preds[0])
 
         # DECODER
         hidden = self.latent2hidden(final_z)
@@ -176,16 +183,23 @@ class SentenceVaeStyle(nn.Module):
         """
         # predictions
     
+        # print(style_z.shape)
         preds = self.style_classifier_1(style_z)
-        preds = self.style_classifier_2(preds)
-        preds = self.style_activation(preds)
-        preds = nn.Softmax(dim=1)(preds)
+        # preds = self.style_classifier_2(preds)
+        # preds = self.style_activation(preds)
+        # print(preds.shape)
+        # preds = nn.Softmax(dim=1)(preds)
+        # print(preds.shape)
+        # exit()
         
         # label smoothing
         smoothed_style_labels = labels * (1-self.label_smoothing) + self.label_smoothing/self.num_style
     
         # calculate cross entropy loss
-        style_mul_loss = nn.BCELoss()(preds, labels.type(torch.FloatTensor).cuda())
+        style_mul_loss = nn.MSELoss()(preds, labels.type(torch.FloatTensor).cuda())
+        # style_mul_loss = F.cross_entropy(preds, labels.type(torch.FloatTensor).cuda())
+
+        
 
         return style_mul_loss, preds
 
