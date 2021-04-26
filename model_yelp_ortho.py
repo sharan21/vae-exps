@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
 from utils import to_var
+import torch.nn.functional as F
 from torch.autograd import Variable
 
 
@@ -75,35 +76,24 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.ortho = ortho
 		self.dropout = nn.Dropout(self.dropout_rate)
   
-	def attention_net(self, lstm_output, final_state):
+	def self_attention(self, lstm_output, final_state):
 
-		""" 
-		Arguments
-		---------
+		# lstm_output : L*B*H
+		# final_state : L*B*1
+	
 		
-		lstm_output : Final output of the LSTM which contains hidden layer outputs for each sequence.
-		final_state : Final time-step hidden state (h_n) of the LSTM
+		# reshaping to satisfy torch.bmm
+		lstm_output_2 = lstm_output.permute(1,0,2) #B*L*H
+		final_state_2 = final_state.permute(1,2,0) #B*1*L
 		
-		---------
+		#get attention scores
+		attn_weights = torch.bmm(lstm_output_2, final_state_2) #B*L, dot product attention
+		soft_attn_weights = F.softmax(attn_weights, 1) #B*L
 		
-		Returns : It performs attention mechanism by first computing weights for each of the sequence present in lstm_output and and then finally computing the
-				  new hidden state.
-				  
-		Tensor Size :
-					hidden.size() = (batch_size, hidden_size)
-					attn_weights.size() = (batch_size, num_seq)
-					soft_attn_weights.size() = (batch_size, num_seq)
-					new_hidden_state.size() = (batch_size, hidden_size)
-					  
-		"""
-		
-		print(lstm_output.shape)
-  		print(final_state.shape)
-		exit()
-  		hidden = final_state.squeeze(0)
-		attn_weights = torch.bmm(lstm_output, hidden.unsqueeze(2)).squeeze(2)
-		soft_attn_weights = F.softmax(attn_weights, 1)
-		new_hidden_state = torch.bmm(lstm_output.transpose(1, 2), soft_attn_weights.unsqueeze(2)).squeeze(2)
+		# weighted sum to get final attention vector
+		lstm_output_2 = lstm_output.permute(1,0,2) #B*L*H, needed for mat mul in next step
+		new_hidden_state = lstm_output_2 * soft_attn_weights #B*L*H * B*L = #B*L*H
+		new_hidden_state = torch.sum(new_hidden_state, axis=1) #B*H
 		
 		return new_hidden_state
 
@@ -121,11 +111,11 @@ class SentenceVaeStyleOrtho(nn.Module):
 		######################### encoder #############################
 		output, (hidden, final_cell_state) = self.encoder(input_embedding, (h_0, c_0))
 
-  		####### self attention
+		  ####### self attention
 		if(self.attention):
-			hidden = self.attention_net(output, hidden)
+			hidden = self.self_attention(output, hidden)
 		else:
-  			hidden = hidden[-1] # take the last hidden state of lstm
+			  hidden = hidden[-1] # take the last hidden state of lstm
 
 		####### if the RNN has multiple layers, flatten all the hiddens states 
 		if self.bidirectional or self.num_layers > 1:
