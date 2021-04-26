@@ -183,7 +183,7 @@ def main(args):
                     optimizer.zero_grad()  # flush grads
                     # loss.backward()  # run bp
                     loss.backward()  # run bp
-                    print(style_preds[0])
+                    
                     # style_mul_loss.backward() 
                     # content_mul_loss.backward()
                     optimizer.step()  # run gd
@@ -227,6 +227,14 @@ def main(args):
 
             print("%s Epoch %02d/%i, Mean ELBO %9.4f" %
                   (split.upper(), epoch, args.epochs, tracker['ELBO'].mean()))
+            
+            # try sample
+            print(style_preds[0])
+            # print results
+            i2w = datasets['train'].get_i2w()
+            w2i = datasets['train'].get_w2i()
+            print(idx2word(batch['input'][0:1], i2w=i2w, pad_idx=w2i['<pad>']))
+            print("neg: {}, pos: {}".format(style_preds[0:1,0], style_preds[0:1,1]))
 
             # more logging
             if args.tensorboard_logging:
