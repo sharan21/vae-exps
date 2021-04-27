@@ -1,28 +1,25 @@
-
-import torch
-import numpy as np
 import os
 import json
-from torch.autograd import Variable
-from collections import defaultdict, Counter, OrderedDict
+import torch
+import argparse
 
-from model import SentenceVAE
+from YelpStyleTransf import SentenceVAE2
 from utils import to_var, idx2word, interpolate
 
 
-import argparse
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 
-def convert_sentences_to_latent(args):
 
-    # load vocab and mapping dictionaries
-    with open('./data/ptb.vocab.json', 'r') as file:
+
+def main(args):
+    with open(args.data_dir+'/yelp/yelpd.vocab.json', 'r') as file:
         vocab = json.load(file)
 
     w2i, i2w = vocab['w2i'], vocab['i2w']
 
-    # init the model
-    model = SentenceVAE(
+    model = SentenceVAE2(
         vocab_size=len(w2i),
         sos_idx=w2i['<sos>'],
         eos_idx=w2i['<eos>'],
@@ -50,14 +47,19 @@ def convert_sentences_to_latent(args):
     
     model.eval()
 
-    
-    #print samples
+    # refer this: https://becominghuman.ai/visualizing-representations-bd9b62447e38
+    pca = PCA(n_components=20)
+    pca_result = pca.fit_transform(hidden_features)
+    print('Variance PCA: {}'.format(np.sum(pca.explained_variance_ratio_)))
+    ##Variance PCA: 0.993621154832802
+
+    #Run T-SNE on the PCA features.
+    tsne = TSNE(n_components=2, verbose = 1)
+    tsne_results = tsne.fit_transform(pca_result[:5000])
+
     samples, z = model.inference(n=args.num_samples)
     print('----------SAMPLES----------')
     print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
-
-
-    #print interpolated samples
 
     z1 = torch.randn([args.latent_size]).numpy()
     z2 = torch.randn([args.latent_size]).numpy()
@@ -66,17 +68,13 @@ def convert_sentences_to_latent(args):
     print('-------INTERPOLATION-------')
     print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
 
-    print("here")
-    
 
-if __name__ == "__main__":
-    
-    #load default arguments, we dont need to specify the exact args to load a saved model
-    
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-c', '--load_checkpoint', type=str)
     parser.add_argument('-n', '--num_samples', type=int, default=10)
+
     parser.add_argument('-dd', '--data_dir', type=str, default='data')
     parser.add_argument('-ms', '--max_sequence_length', type=int, default=50)
     parser.add_argument('-eb', '--embedding_size', type=int, default=300)
@@ -84,15 +82,14 @@ if __name__ == "__main__":
     parser.add_argument('-hs', '--hidden_size', type=int, default=256)
     parser.add_argument('-wd', '--word_dropout', type=float, default=0)
     parser.add_argument('-ed', '--embedding_dropout', type=float, default=0.5)
-    parser.add_argument('-ls', '--latent_size', type=int, default=16)
+    parser.add_argument('-ls', '--latent_size', type=int, default=40)
     parser.add_argument('-nl', '--num_layers', type=int, default=1)
     parser.add_argument('-bi', '--bidirectional', action='store_true')
 
     args = parser.parse_args()
     args.rnn_type = args.rnn_type.lower()
-    args.load_checkpoint = './bin/2021-Apr-01-11-13-11/E9.pytorch'
 
-    # assert args.rnn_type in ['rnn', 'lstm', 'gru']
-    # assert 0 <= args.word_dropout <= 1
+    assert args.rnn_type in ['rnn', 'lstm', 'gru']
+    assert 0 <= args.word_dropout <= 1
 
-    convert_sentences_to_latent(args)
+    main(args)
