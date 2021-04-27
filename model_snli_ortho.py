@@ -37,7 +37,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		# self.bidirectional = False
 		self.num_layers = num_layers
 		self.hidden_size = hidden_size 
-		self.output_size = 2
+		self.output_size = 4
 
 		self.embedding = nn.Embedding(vocab_size, embedding_size)
 		self.word_dropout_rate = word_dropout

@@ -117,9 +117,17 @@ def main(args):
     # this functiom is used to compute the 2 loss terms and KL loss weight
     def loss_fn(logp, target, length, mean, logv, anneal_function, step, k, x0):
 
+        
+
         # cut-off unnecessary padding from target, and flatten
         target = target[:, :torch.max(length).item()].contiguous().view(-1)
         logp = logp.view(-1, logp.size(2))
+
+        print(logp.shape)
+        print(target.shape)
+        exit()
+
+       
 
         # Negative Log Likelihood
         NLL_loss = NLL(logp, target)
