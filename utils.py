@@ -22,6 +22,10 @@ def to_var(x):
         x = x.cuda()
     return x
 
+
+
+
+
 def load_model_params_from_checkpoint(path_to_params):
     with open(path_to_params) as json_file:
         params = json.load(json_file)

@@ -27,7 +27,7 @@ import argparse
 def main(args):
 
     ################ config your params here ########################
-    ortho = False
+    ortho = True
     attention = False
     hspace_classifier = False
     diversity = False
