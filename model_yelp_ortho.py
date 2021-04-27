@@ -9,7 +9,7 @@ from torch.autograd import Variable
 class SentenceVaeStyleOrtho(nn.Module):
 	def __init__(self, vocab_size, embedding_size, rnn_type, hidden_size, word_dropout, embedding_dropout, latent_size,
 				sos_idx, eos_idx, pad_idx, unk_idx, max_sequence_length, num_layers=1, bidirectional=False, ortho=False, 
-				attention=False, hspace_classifier=False):
+				attention=False, hspace_classifier=False, diversity=False):
 
 		super().__init__()
 
@@ -17,6 +17,8 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.ortho = ortho
 		self.attention = attention
 		self.hspace_classifier = hspace_classifier
+		self.diversity = diversity
+		self.diversity_weight = 10 # if diversity loss is enabled, this is the scaling factor, more diversity, more orthogonalisation
 
 		self.tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
@@ -29,7 +31,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.unk_idx = unk_idx
 
 		self.latent_size = latent_size
-		self.style_content_split = 0.75 #needs to be implemented 
+		self.style_content_split = 0.5 #needs to be implemented 
 
 		self.rnn_type = rnn_type
 		# self.bidirectional = bidirectional # bidrectional doesnt work well
@@ -42,6 +44,9 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.word_dropout_rate = word_dropout
 		self.embedding_dropout = nn.Dropout(p=embedding_dropout)
 		
+		if(self.style_content_split != 0.5 and (self.ortho or self.diversity)):
+			print("does not suppose style:content split as non 0.5 yet!")
+			exit()
 
 		if rnn_type == 'rnn':
 			rnn = nn.RNN
@@ -59,16 +64,16 @@ class SentenceVaeStyleOrtho(nn.Module):
 			self.hspace_classifier_layer = nn.Linear(self.hidden_size * self.hidden_factor, self.output_size)	
 
 		######## hidden to style space ########
-		self.hidden2stylemean = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/4))
-		self.hidden2stylelogv = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/4))
+		self.hidden2stylemean = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/2))
+		self.hidden2stylelogv = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/2))
 
 		######### hidden to content space#######
-		self.hidden2contentmean = nn.Linear(hidden_size * self.hidden_factor, int(3*latent_size/4))
-		self.hidden2contentlogv = nn.Linear(hidden_size * self.hidden_factor, int(3*latent_size/4))
+		self.hidden2contentmean = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/2))
+		self.hidden2contentlogv = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/2))
 
 		########## classifiers ############
-		self.content_classifier = nn.Linear(int(3*latent_size/4), self.content_bow_dim)
-		self.style_classifier = nn.Linear(int(latent_size/4), self.output_size) # for correlating style space to sentiment
+		self.content_classifier = nn.Linear(int(latent_size/2), self.content_bow_dim)
+		self.style_classifier = nn.Linear(int(latent_size/2), self.output_size) # for correlating style space to sentiment
 		
 		############ adversaries ###########
 		# need to add these
@@ -121,7 +126,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		######################### encoder #############################
 		output, (hidden, final_cell_state) = self.encoder(input_embedding, (h_0, c_0))
 
-		  ####### self attention
+		####### self attention
 		if(self.attention):
 			if(self.style_content_split != 0.5):
 				print("Cannot orthogonalise style and content embeddings of different dims!")
@@ -151,7 +156,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		style_logv = self.hidden2stylelogv(hidden) #calc latent variance
 		style_std = torch.exp(0.5 * style_logv) #find sd
 
-		style_z = to_var(torch.randn([batch_size, int(self.latent_size/4)])) #get a random vector
+		style_z = to_var(torch.randn([batch_size, int(self.latent_size/2)])) #get a random vector
 		# style_z = style_z * style_std + style_mean #compute datapoint
 		style_z = style_z * torch.exp(style_logv) + style_mean #compute datapoint
 
@@ -161,19 +166,32 @@ class SentenceVaeStyleOrtho(nn.Module):
 		content_logv = self.hidden2contentlogv(hidden) #calc latent variance
 		content_std = torch.exp(0.5 * content_logv) #find sd
 
-		content_z = to_var(torch.randn([batch_size, int(3*self.latent_size/4)])) #get a random vector
+		content_z = to_var(torch.randn([batch_size, int(self.latent_size/2)])) #get a random vector
 		# content_z = content_z * content_std + content_mean #compute datapoint
 		content_z = content_z * torch.exp(content_logv) + content_mean #compute datapoint
 
 
-		####################### orthogonalise content_z w.r.t style_z
+		####################### orthogonalise content_z w.r.t style_z using Gram schmitt
 		
 		if(self.ortho): #from https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
 			u_v = torch.dot(style_z, content_z)
-			u_u = torch.dot(style_z, style)
+			u_u = torch.dot(style_z, style_z)
 			content_z = u_v/u_u * style_z #orthogonalised content
-			print("here")
+			print("Need to test ortho!") # need to fix dimentionality problem
 			exit()
+
+		####################### orthogonalise content_z w.r.t style_z using Gram schmitt
+		if(self.ortho is True and self.diversity is True): 
+			print("you have enabled both GS orthoganlisation and Diversity loss, pick one!")
+			exit()
+		if(self.diversity): ##from https://arxiv.org/abs/1704.08300
+			diversity_loss = style_z*content_z # B*latent_size
+			diversity_loss = torch.sum(diversity_loss, axis=-1) #B
+			diversity_loss = torch.mean(diversity_loss, axis=0) #1
+			# print(diversity_loss.shape) #1
+			# exit()
+		else:
+			diversity_loss = 0
 
 		#######################concat style and concat
 
@@ -226,7 +244,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
 		logp = logp.view(b, s, self.embedding.num_embeddings)
 
-		return logp, final_mean, final_logv, final_z, style_preds, content_preds, hspace_preds
+		return logp, final_mean, final_logv, final_z, style_preds, content_preds, hspace_preds, diversity_loss
 
 
 	

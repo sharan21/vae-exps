@@ -7,33 +7,35 @@ import numpy as np
 from collections import defaultdict
 from torch.utils.data import Dataset
 from nltk.tokenize import TweetTokenizer
-
+from collections import OrderedDict, defaultdict
 from utils import OrderedCounter
 
-class Yelp(Dataset):
+class Snli(Dataset):
 
-    def __init__(self, data_dir, split, create_data, **kwargs):
+    def __init__(self, split, create_data=False, **kwargs):
 
         super().__init__()
-        self.data_dir = data_dir
+        self.data_dir = './data/snli/'
+        self.save_model_path = './bin'
         self.split = split
-        self.max_sequence_length = kwargs.get('max_sequence_length', 50)
+
+        self.max_sequence_length = 50 #to avoid CUDA out of memory
         self.min_occ = kwargs.get('min_occ', 3)
 
-        self.raw_data_path = os.path.join(data_dir, 'snli_1.0_dev.jsonl')
-        # self.raw_data_path_p = os.path.join(data_dir, 'sentiment.'+split+'.1.txt')
-        self.data_file = 'snli.'+split+'.json'
+        self.raw_data_path = self.data_dir + 'snli_1.0_' + self.split + '.jsonl'
+        self.data_file = 'snli.'+ split +'.json'
         self.vocab_file = 'snli.vocab.json'
 
-        if create_data:
-            print("Creating new %s snli data."%split.upper())
-            self._create_data()
+        # if create_data:
+        #     print("Creating new %s snli data."%split.upper())
+        #     self._create_data()
 
-        elif not os.path.exists(os.path.join(self.data_dir, self.data_file)):
+        if not os.path.exists(os.path.join(self.data_dir, self.data_file)):
             print("%s preprocessed file not found at %s. Creating new."%(split.upper(), os.path.join(self.data_dir, self.data_file)))
             self._create_data()
 
         else:
+            print(" found preprocessed files, no need tooo create data!")
             self._load_data()
 
 
@@ -100,7 +102,7 @@ class Yelp(Dataset):
             self._create_vocab()
         else:
             self._load_vocab()
-        print("from_create_Data")
+        # print("from_create_Data")
         tokenizer = TweetTokenizer(preserve_case=False)
 
         data = defaultdict(dict)
@@ -108,7 +110,6 @@ class Yelp(Dataset):
             for i, line in enumerate(file):
 
                 if(i>21033):
-                    print("breaking")
                     break
 
                 words = tokenizer.tokenize(line['sentence1'])
@@ -183,3 +184,40 @@ class Yelp(Dataset):
 
         self._load_vocab()
         
+if __name__ == "__main__":
+    # prepare dataset
+    splits = ['train', 'test']
+
+    # create dataset object
+    datasets = OrderedDict()
+
+    # create test and train split in data, also preprocess
+    for split in splits:
+        # print("creating dataset for: {}".format(split))
+        datasets[split] = Snli(
+            split=split,
+            create_data=False,
+            min_occ=2
+        )
+
+    # get training params
+    # params = dict(
+    #     vocab_size=datasets['train'].vocab_size,
+    #     sos_idx=datasets['train'].sos_idx,
+    #     eos_idx=datasets['train'].eos_idx,
+    #     pad_idx=datasets['train'].pad_idx,
+    #     unk_idx=datasets['train'].unk_idx,
+    #     max_sequence_length=datasets['train'].max_sequence_length,
+    #     embedding_size=args.embedding_size,
+    #     rnn_type=args.rnn_type,
+    #     hidden_size=args.hidden_size,
+    #     word_dropout=args.word_dropout,
+    #     embedding_dropout=args.embedding_dropout,
+    #     latent_size=args.latent_size,
+    #     num_layers=args.num_layers,
+    #     bidirectional=args.bidirectional,
+    #     ortho=ortho,
+    #     attention=attention,
+    #     hspace_classifier=hspace_classifier
+    # )
+    

@@ -29,7 +29,8 @@ def main(args):
     ################ config your params here ########################
     ortho = False
     attention = False
-    hspace_classifier = True
+    hspace_classifier = False
+    diversity = True
     
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
@@ -69,7 +70,8 @@ def main(args):
         bidirectional=args.bidirectional,
         ortho=ortho,
         attention=attention,
-        hspace_classifier=hspace_classifier
+        hspace_classifier=hspace_classifier,
+        diversity=diversity
     )
 
     # init model object
@@ -168,9 +170,7 @@ def main(args):
                     
             
                 # Forward pass
-                logp, final_mean, final_logv, final_z, style_preds, content_preds, hspace_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
-
-               
+                logp, final_mean, final_logv, final_z, style_preds, content_preds, hspace_preds, diversity_loss = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # print results
                 # print(idx2word(batch['input'], i2w=i2w, pad_idx=w2i['<pad>']))
@@ -196,7 +196,13 @@ def main(args):
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    vae_loss.backward()  # run bp
+                    
+                    if(diversity):
+                        vae_loss.backward(retain_graph = True)  # run bp
+                        diversity_loss.backward()
+                    else:
+                        vae_loss.backward()  # run bp
+
                     optimizer.step()  # run gd
                     step += 1
 
@@ -217,9 +223,9 @@ def main(args):
 
                 
                 if iteration % args.print_every == 0 or iteration+1 == len(data_loader):
-                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f, Hspace-Loss %9.4f"
+                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f, Hspace-Loss %9.4f, Diversity-Loss %9.4f"
                           % (split.upper(), iteration, len(data_loader)-1, vae_loss.item(), NLL_loss.item()/batch_size,
-                             KL_loss.item()/batch_size, KL_weight, style_classifier_loss, content_classifier_loss, hspace_classifier_loss))
+                             KL_loss.item()/batch_size, KL_weight, style_classifier_loss, content_classifier_loss, hspace_classifier_loss, diversity_loss))
                     
                 if split == 'valid':
                     if 'target_sents' not in tracker:

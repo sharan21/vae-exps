@@ -24,7 +24,7 @@ import argparse
 
 class Yelpd(Dataset):
 
-    def __init__(self, split, create_data, have_vocab=False,  **kwargs):
+    def __init__(self, split, create_data=False, have_vocab=False,  **kwargs):
 
         super().__init__()
         self.data_dir = "./data/yelp/"
@@ -211,7 +211,6 @@ class Yelpd(Dataset):
             i2w[len(w2i)] = st
             w2i[st] = len(w2i)
 
-        print("here")
 
         with open(self.raw_data_path, 'r') as file:
 
