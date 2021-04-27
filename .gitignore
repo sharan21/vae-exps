@@ -1,6 +1,8 @@
 __pycache__
+_MACOSX/
 data/yelp/
 data/ptb/
+data/snli/
 bin/
 dumps/
 figs
