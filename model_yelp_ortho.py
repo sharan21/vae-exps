@@ -12,6 +12,12 @@ class SentenceVaeStyleOrtho(nn.Module):
 				attention=False, hspace_classifier=False):
 
 		super().__init__()
+
+		
+		self.ortho = ortho
+		self.attention = attention
+		self.hspace_classifier = hspace_classifier
+
 		self.tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
 		self.content_bow_dim = 7526
@@ -23,7 +29,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.unk_idx = unk_idx
 
 		self.latent_size = latent_size
-		self.style_content_split = 0.75 # 
+		self.style_content_split = 0.75 #needs to be implemented 
 
 		self.rnn_type = rnn_type
 		# self.bidirectional = bidirectional # bidrectional doesnt work well
@@ -35,7 +41,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.embedding = nn.Embedding(vocab_size, embedding_size)
 		self.word_dropout_rate = word_dropout
 		self.embedding_dropout = nn.Dropout(p=embedding_dropout)
-		self.attention = attention
+		
 
 		if rnn_type == 'rnn':
 			rnn = nn.RNN
@@ -47,6 +53,10 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.encoder = nn.LSTM(embedding_size, hidden_size)
 		self.decoder = rnn(embedding_size, hidden_size, num_layers=num_layers, bidirectional=self.bidirectional, batch_first=True)
 		self.hidden_factor = (2 if bidirectional else 1) * num_layers
+
+		######## add hspace classifier #######
+		if(self.hspace_classifier):
+			self.hspace_classifier_layer = nn.Linear(self.hidden_size * self.hidden_factor, self.output_size)	
 
 		######## hidden to style space ########
 		self.hidden2stylemean = nn.Linear(hidden_size * self.hidden_factor, int(latent_size/4))
@@ -60,7 +70,6 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.content_classifier = nn.Linear(int(3*latent_size/4), self.content_bow_dim)
 		self.style_classifier = nn.Linear(int(latent_size/4), self.output_size) # for correlating style space to sentiment
 		
-
 		############ adversaries ###########
 		# need to add these
 
@@ -75,7 +84,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.label_smoothing = 0.1
 		self.num_style = 2
 		self.dropout_rate = 0.5
-		self.ortho = ortho
+		
 		self.dropout = nn.Dropout(self.dropout_rate)
   
 	def self_attention(self, lstm_output, final_state):
@@ -114,7 +123,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 
 		  ####### self attention
 		if(self.attention):
-			if(self.style_content_split != 0.5)
+			if(self.style_content_split != 0.5):
 				print("Cannot orthogonalise style and content embeddings of different dims!")
 				exit()
 			hidden = self.self_attention(output, hidden)
@@ -126,6 +135,12 @@ class SentenceVaeStyleOrtho(nn.Module):
 			hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
 		else:
 			hidden = hidden.squeeze()
+
+		###################### proposal 1: hspace classifier ##################
+		if(self.hspace_classifier):
+			hspace_preds = self.hspace_classifier_layer(hidden)
+		else:
+			hspace_preds = None
 
 		
 		##################### REPARAMETERIZATION of style and content #######################
@@ -211,7 +226,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
 		logp = logp.view(b, s, self.embedding.num_embeddings)
 
-		return logp, final_mean, final_logv, final_z, style_preds, content_preds
+		return logp, final_mean, final_logv, final_z, style_preds, content_preds, hspace_preds
 
 
 	

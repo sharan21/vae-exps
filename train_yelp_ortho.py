@@ -26,6 +26,11 @@ import argparse
 
 def main(args):
 
+    ################ config your params here ########################
+    ortho = False
+    attention = False
+    hspace_classifier = True
+    
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
     ts = ts.replace(':', '-')
@@ -62,8 +67,9 @@ def main(args):
         latent_size=args.latent_size,
         num_layers=args.num_layers,
         bidirectional=args.bidirectional,
-        ortho=False,
-        attention=False
+        ortho=ortho,
+        attention=attention,
+        hspace_classifier=hspace_classifier
     )
 
     # init model object
@@ -162,7 +168,9 @@ def main(args):
                     
             
                 # Forward pass
-                logp, final_mean, final_logv, final_z, style_preds, content_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
+                logp, final_mean, final_logv, final_z, style_preds, content_preds, hspace_preds = model(batch['input'], batch['length'], batch['label'], batch['bow'])
+
+               
 
                 # print results
                 # print(idx2word(batch['input'], i2w=i2w, pad_idx=w2i['<pad>']))
@@ -171,20 +179,24 @@ def main(args):
                 # nll and kl loss calculation
                 NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], final_mean, final_logv, args.anneal_function, step, args.k, args.x0)
 
-                # style classifier loss
+                # style and classifier loss
                 style_classifier_loss = nn.MSELoss()(style_preds, batch['label'].type(torch.FloatTensor).cuda()) #classification loss
                 content_classifier_loss = nn.MSELoss()(content_preds, batch['bow'].type(torch.FloatTensor).cuda()) #classification loss
 
+                # (Proposal 1) hspace loss
+                if(hspace_preds is None):
+                    hspace_classifier_loss = 0
+                else:
+                    hspace_classifier_loss = nn.MSELoss()(hspace_preds, batch['label'].type(torch.FloatTensor).cuda()) 
+                
                 # final loss calculation
-                vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size + style_classifier_loss*1000 + content_classifier_loss*1000
+                vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size + style_classifier_loss*1000 + content_classifier_loss*1000 + hspace_classifier_loss*1000
                 # vae_loss = (NLL_loss + KL_weight * KL_loss) / batch_size
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
                     vae_loss.backward()  # run bp
-                    # style_classifier_loss.backward()  # run bp
-                    # content_classifier_loss.backward()
                     optimizer.step()  # run gd
                     step += 1
 
@@ -205,9 +217,9 @@ def main(args):
 
                 
                 if iteration % args.print_every == 0 or iteration+1 == len(data_loader):
-                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f"
+                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f, Hspace-Loss %9.4f"
                           % (split.upper(), iteration, len(data_loader)-1, vae_loss.item(), NLL_loss.item()/batch_size,
-                             KL_loss.item()/batch_size, KL_weight, style_classifier_loss, content_classifier_loss))
+                             KL_loss.item()/batch_size, KL_weight, style_classifier_loss, content_classifier_loss, hspace_classifier_loss))
                     
                 if split == 'valid':
                     if 'target_sents' not in tracker:
@@ -220,8 +232,8 @@ def main(args):
                   (split.upper(), epoch, args.epochs, tracker['ELBO'].mean()))
             
             # try sample
-            print(idx2word(batch['input'][0:1], i2w=i2w, pad_idx=w2i['<pad>']))
-            print("neg: {}, pos: {}".format(style_preds[0:1,0], style_preds[0:1,1]))
+            # print(idx2word(batch['input'][0:1], i2w=i2w, pad_idx=w2i['<pad>']))
+            # print("neg: {}, pos: {}".format(style_preds[0:1,0], style_preds[0:1,1]))
 
             # more logging
             if args.tensorboard_logging:
