@@ -29,8 +29,8 @@ def main(args):
     ################ config your params here ########################
     ortho = False
     attention = False
-    hspace_classifier = True
-    diversity = True
+    hspace_classifier = False
+    diversity = False
     
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
@@ -268,7 +268,7 @@ if __name__ == '__main__':
     parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')
     parser.add_argument('-hs', '--hidden_size', type=int, default=256)
     parser.add_argument('-nl', '--num_layers', type=int, default=1)
-    parser.add_argument('-bi', '--bidirectional', action='store_true')
+    parser.add_argument('-bi', '--bidirectional', action='store_true') 
     parser.add_argument('-ls', '--latent_size', type=int, default=40)
     parser.add_argument('-wd', '--word_dropout', type=float, default=0.0)
     parser.add_argument('-ed', '--embedding_dropout', type=float, default=0.5)
@@ -282,6 +282,9 @@ if __name__ == '__main__':
     parser.add_argument('-log', '--logdir', type=str, default='logs')
 
     args = parser.parse_args()
+    
+    #NOTE: if bidirection = true, NLL will overfit, Classifiers will underfit, so dont use this
+    # args.bidirectional = True
 
     args.rnn_type = args.rnn_type.lower()
     args.anneal_function = args.anneal_function.lower()

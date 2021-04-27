@@ -4,7 +4,7 @@ import torch
 import argparse
 
 from model_yelp_ortho import SentenceVaeStyleOrtho
-from utils import to_var, idx2word, interpolate
+from utils import to_var, idx2word, interpolate, load_model_params_from_checkpoint
 
 
 def main(args):
@@ -13,26 +13,19 @@ def main(args):
 
     w2i, i2w = vocab['w2i'], vocab['i2w']
 
-    model = SentenceVaeStyleOrtho(
-        vocab_size=len(w2i),
-        sos_idx=w2i['<sos>'],
-        eos_idx=w2i['<eos>'],
-        pad_idx=w2i['<pad>'],
-        unk_idx=w2i['<unk>'],
-        max_sequence_length=args.max_sequence_length,
-        embedding_size=args.embedding_size,
-        rnn_type=args.rnn_type,
-        hidden_size=args.hidden_size,
-        word_dropout=args.word_dropout,
-        embedding_dropout=args.embedding_dropout,
-        latent_size=args.latent_size,
-        num_layers=args.num_layers,
-        bidirectional=args.bidirectional
-        )
-
     if not os.path.exists(args.load_checkpoint):
         raise FileNotFoundError(args.load_checkpoint)
 
+    if not os.path.exists(args.load_params):
+        raise FileNotFoundError(args.load_params)
+
+    # load params
+    params = load_model_params_from_checkpoint(args.load_params)
+
+    # create model
+    model = SentenceVaeStyleOrtho(**params)
+
+    print(model)
     model.load_state_dict(torch.load(args.load_checkpoint))
     print("Model loaded from %s" % args.load_checkpoint)
 
@@ -57,6 +50,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-c', '--load_checkpoint', type=str)
+    parser.add_argument('-p', '--load_params', type=str)
     parser.add_argument('-n', '--num_samples', type=int, default=10)
 
     parser.add_argument('-dd', '--data_dir', type=str, default='data')

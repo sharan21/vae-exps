@@ -4,6 +4,8 @@ from torch.autograd import Variable
 from collections import defaultdict, Counter, OrderedDict
 
 import argparse
+import json
+
 
 
 class OrderedCounter(Counter, OrderedDict):
@@ -19,6 +21,12 @@ def to_var(x):
     if torch.cuda.is_available():
         x = x.cuda()
     return x
+
+def load_model_params_from_checkpoint(path_to_params):
+    with open(path_to_params) as json_file:
+        params = json.load(json_file)
+    
+    return params
 
 
 def idx2word(idx, i2w, pad_idx):

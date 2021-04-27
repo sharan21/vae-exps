@@ -30,7 +30,7 @@ class SentenceVaeStyleOrtho(nn.Module):
 		self.unk_idx = unk_idx
 
 		self.latent_size = latent_size
-		self.style_content_split = 0.5 #needs to be implemented 
+		self.style_content_split = 0.5 #if this is not 0.5, we cannot take dot product of style_z and content_z!
 
 		self.rnn_type = rnn_type
 		self.bidirectional = bidirectional # need to be implemented
