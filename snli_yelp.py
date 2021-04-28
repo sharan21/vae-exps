@@ -30,22 +30,20 @@ class SnliYelp(Dataset):
             os.makedirs("./data/snli_yelp")
 
 
-        
-
         self.data_dir = "./data/snli_yelp"
         self.yelp_data_dir = "./data/yelp/"
         self.snli_data_dir = "./data/snli/"
         self.save_model_path = "./bin"
         self.split = split
 
-        self.yelp_bow_hidden_dim = 7526
+        self.bow_hidden_dim = 7526
 
         # self.max_sequence_length = 1165
         self.max_sequence_length = 116 # yelp as 116, snli has 50, take max
         self.min_occ = kwargs.get('min_occ', 3)
 
-        # self.num_lines = 560000
-        self.num_lines = 56
+        self.num_lines = 56 #in each dataset
+        # self.num_lines = 56
         self.have_vocab = have_vocab
 
         self.yelp_raw_data_path = os.path.join(self.yelp_data_dir, 'yelp.'+split+'.csv')
@@ -82,15 +80,18 @@ class SnliYelp(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+        
         idx = str(idx)
+        one_hot = np.zeros(6)
+        one_hot[int(self.data[idx]['label'])] = 1
 
         return {
             'input': np.asarray(self.data[idx]['input']),
             'target': np.asarray(self.data[idx]['target']),
             'bow': self._get_bow_representations(self.data[idx]['input']),
-            # 'label': np.asarray(self.data[idx]['label']),
-            'label': np.asarray([1-self.data[idx]['label'], self.data[idx]['label']]), # we need to make it 2 dim to match predicted label dim.
-            'length': self.data[idx]['length']
+            'length': self.data[idx]['length'],
+            'label': one_hot
+            # 'label': np.asarray([1-self.data[idx]['label'], self.data[idx]['label']]),
         }
 
     @property
@@ -130,9 +131,6 @@ class SnliYelp(Dataset):
                 vocab = json.load(file)
             self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
     
-
-
-
     def _load_vocab(self):
         with open(os.path.join(self.data_dir, self.vocab_file), 'r') as vocab_file:
             vocab = json.load(vocab_file)
@@ -153,7 +151,7 @@ class SnliYelp(Dataset):
 
         tokenizer = TweetTokenizer(preserve_case=False)
 
-        # first for yelp
+        print("first for yelp")
 
         data = defaultdict(dict)
 
@@ -194,8 +192,8 @@ class SnliYelp(Dataset):
                 data[id]['length'] = length
 
 
-        # now for snli
-        # data_snli = defaultdict(dict)
+        print("next for snli")
+
 
         with jsonlines.open(self.snli_raw_data_path, 'r') as file:
             for i, line in enumerate(tqdm(file, total=self.num_lines)):
@@ -225,7 +223,6 @@ class SnliYelp(Dataset):
                 
                 labels=['entailment','neutral','contradiction','-']
                 labl=labels.index(line['gold_label'])
-                
 
                 id = len(data)
                 data[id]['input'] = input
@@ -255,7 +252,6 @@ class SnliYelp(Dataset):
 
         return data_shuffled
 
-        
 
     def _create_combined_vocab(self):
         # this function uses both snli + yelp to create vocab
@@ -282,17 +278,8 @@ class SnliYelp(Dataset):
                     break
                 words = tokenizer.tokenize(line)
                 w2c.update(words)
-
-            # print("done creating w2c")
-            for w, c in tqdm(w2c.items()):
-                if c > self.min_occ and w not in special_tokens:
-                    i2w[len(w2i)] = w
-                    w2i[w] = len(w2i)
-
-            # print("done creating w2i")
-        assert len(w2i) == len(i2w)
-
-        # now for yelp
+        
+        # now for snli
         with open(self.snli_raw_data_path, 'r') as file:
 
             for i, line in enumerate(tqdm(file, total=self.num_lines)):
@@ -301,17 +288,15 @@ class SnliYelp(Dataset):
                 words = tokenizer.tokenize(line)
                 w2c.update(words)
 
-            # print("done creating w2c")
-            for w, c in tqdm(w2c.items()):
-                if c > self.min_occ and w not in special_tokens:
-                    i2w[len(w2i)] = w
-                    w2i[w] = len(w2i)
+        for w, c in tqdm(w2c.items()):
+            if c > self.min_occ and w not in special_tokens:
+                i2w[len(w2i)] = w
+                w2i[w] = len(w2i)
 
-            # print("done creating w2i")
+            
         assert len(w2i) == len(i2w)
 
-
-        print("Vocablurary of %i keys created." % len(w2i))
+        print("Vocabulary of %i keys created." % len(w2i))
 
         vocab = dict(w2i=w2i, i2w=i2w)
 

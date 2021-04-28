@@ -119,7 +119,7 @@ def main(args):
 
         # cut-off unnecessary padding from target, and flatten
        
-        target = target[:, :50].contiguous().view(-1)
+        target = target[:, :datasets["train"].max_sequence_length].contiguous().view(-1)
         logp = logp.view(-1, logp.size(2))
 
         # Negative Log Likelihood        

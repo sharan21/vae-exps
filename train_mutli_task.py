@@ -16,8 +16,8 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import torch.nn as nn
 
-from model_snli_ortho import SentenceVaeStyleOrtho
-from snli import SNLI
+from model_multitask_ortho import SentenceVaeStyleOrtho
+from snli_yelp import SnliYelp
 from utils import idx2word
 import argparse
 
@@ -25,7 +25,7 @@ import argparse
 def main(args):
 
     ################ config your params here ########################
-    ortho = True
+    ortho = False
     attention = False
     hspace_classifier = False
     diversity = False
@@ -44,7 +44,7 @@ def main(args):
     # create test and train split in data, also preprocess
     for split in splits:
         print("creating dataset for: {}".format(split))
-        datasets[split] = SNLI(
+        datasets[split] = SnliYelp(
             split=split,
             create_data=args.create_data,
             min_occ=args.min_occ
@@ -117,7 +117,7 @@ def main(args):
 
         # cut-off unnecessary padding from target, and flatten
        
-        target = target[:, :50].contiguous().view(-1)
+        target = target[:, :datasets["train"].max_sequence_length].contiguous().view(-1)
         logp = logp.view(-1, logp.size(2))
 
         # Negative Log Likelihood        
@@ -267,7 +267,7 @@ if __name__ == '__main__':
     parser.add_argument('--test', action='store_true')
 
     parser.add_argument('-ep', '--epochs', type=int, default=10)
-    parser.add_argument('-bs', '--batch_size', type=int, default=32)
+    parser.add_argument('-bs', '--batch_size', type=int, default=8)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
     parser.add_argument('-eb', '--embedding_size', type=int, default=300)
