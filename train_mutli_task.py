@@ -162,22 +162,23 @@ def main(args):
                 # get batch size
                 batch_size = batch['input'].size(0)
 
-                # print(batch['input'].shape)
-                # print(batch['target'].shape)
-                # exit()
-
+               
                 for k, v in batch.items():
                     if torch.is_tensor(v):
                         batch[k] = to_var(v)
+
+                # try sample
+                # print(idx2word(batch['target'][0:1], i2w=i2w, pad_idx=w2i['<pad>']))
+                # print(batch['label'][0])
+                # continue
+                # print("neg: {}, pos: {}".format(style_preds[0:1,0], style_preds[0:1,1]))
 
                 # Forward pass
                 logp, final_mean, final_logv, final_z, style_preds, content_preds, hspace_preds, diversity_loss = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # loss calculation
                 NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], final_mean, final_logv, args.anneal_function, step, args.k, args.x0)
-                # print(style_preds.shape)
-                # print(batch['label'].shape)
-                # exit()
+        
                 style_loss = nn.MSELoss()(style_preds, batch['label'].type(torch.FloatTensor).cuda()) #classification loss
                 content_loss = nn.MSELoss()(content_preds, batch['bow'].type(torch.FloatTensor).cuda()) #classification loss
 
@@ -266,7 +267,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=10)
+    parser.add_argument('-ep', '--epochs', type=int, default=32)
     parser.add_argument('-bs', '--batch_size', type=int, default=8)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 

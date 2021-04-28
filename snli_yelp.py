@@ -39,10 +39,10 @@ class SnliYelp(Dataset):
         self.bow_hidden_dim = 7526
 
         # self.max_sequence_length = 1165
-        self.max_sequence_length = 116 # yelp as 116, snli has 50, take max
-        self.min_occ = kwargs.get('min_occ', 3)
+        self.max_sequence_length = 5 # yelp as 116, snli has 50, take max
+        self.min_occ = 2
 
-        self.num_lines = 56 #in each dataset
+        self.num_lines = 30000 #in each dataset
         # self.num_lines = 56
         self.have_vocab = have_vocab
 
@@ -83,7 +83,14 @@ class SnliYelp(Dataset):
         
         idx = str(idx)
         one_hot = np.zeros(6)
-        one_hot[int(self.data[idx]['label'])] = 1
+        
+        try:
+            one_hot[int(self.data[idx]['label'])] = 1
+        except KeyError:
+            while True:
+                print(idx)
+                print(self.data[idx])
+            exit()
 
         return {
             'input': np.asarray(self.data[idx]['input']),
@@ -170,6 +177,9 @@ class SnliYelp(Dataset):
 
                 input = ['<sos>'] + words
                 input = input[:self.max_sequence_length]
+
+                # input = ['<sos>'] + words[:self.max_sequence_length] + ['<eos>']
+                # input = ['<sos>'] + words[:self.max_sequence_length] + ['<eos>']
 
                 target = words[:self.max_sequence_length-1]
                 target = target + ['<eos>']
