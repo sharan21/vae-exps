@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from nltk.tokenize import TweetTokenizer
 from collections import OrderedDict, defaultdict
 from utils import OrderedCounter
+from tqdm import tqdm
 
 class SNLI(Dataset):
 
@@ -21,8 +22,15 @@ class SNLI(Dataset):
 
         self.max_sequence_length = 50 #to avoid CUDA out of memory
         self.min_occ = kwargs.get('min_occ', 3)
-        self.num_lines = 56000
+        # self.yelp_num_lines = 56000
+        self.num_lines = 550153
         self.bow_hidden_dim = 7526
+
+        if not os.path.exists(self.vocab_file):
+            self.have_vocab = False
+        else:
+            self.have_vocab = True
+
 
         self.raw_data_path = self.data_dir + 'snli_1.0_' + self.split + '.jsonl'
         self.data_file = 'snli.'+ split +'.json'
@@ -107,16 +115,19 @@ class SNLI(Dataset):
 
     def _create_data(self):
 
-        if self.split == 'train':
+        if not self.have_vocab and self.split == 'train':
+            print("creating vocab for train!")
             self._create_vocab()
+            print("finished creating vocab!")
         else:
             self._load_vocab()
-        # print("from_create_Data")
+            print("loaded vocab from mem!")
+        
         tokenizer = TweetTokenizer(preserve_case=False)
 
         data = defaultdict(dict)
         with jsonlines.open(self.raw_data_path, 'r') as file:
-            for i, line in enumerate(file):
+            for i, line in enumerate(tqdm(file, total=self.num_lines)):
 
                 if(i == self.num_lines):
                     break
@@ -174,8 +185,8 @@ class SNLI(Dataset):
             w2i[st] = len(w2i)
 
         with jsonlines.open(self.raw_data_path, 'r') as file:
-            print("reading for vocan {0}".format(self.raw_data_path))
-            for i, line in enumerate(file):
+            print("creating vocab in {0}".format(self.raw_data_path))
+            for i, line in enumerate(tqdm(file, total=self.num_lines)):
                 words = tokenizer.tokenize(line['sentence1'])
                 w2c.update(words)
 
@@ -193,7 +204,7 @@ class SNLI(Dataset):
             data = json.dumps(vocab, ensure_ascii=False)
             vocab_file.write(data.encode('utf8', 'replace'))
 
-        self._load_vocab()\
+        self._load_vocab()
     
     def _get_bow_representations(self, text_sequence):
         """

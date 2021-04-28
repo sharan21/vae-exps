@@ -10,9 +10,7 @@ from multiprocessing import cpu_count
 from utils import to_var, idx2word, expierment_name
 from torch.utils.data import DataLoader
 from nltk.tokenize import TweetTokenizer
-
 from collections import OrderedDict, defaultdict
-
 from utils import OrderedCounter
 from tqdm import tqdm
 import torch.nn.functional as F
@@ -27,7 +25,7 @@ import argparse
 def main(args):
 
     ################ config your params here ########################
-    ortho = False
+    ortho = True
     attention = False
     hspace_classifier = False
     diversity = False
@@ -35,7 +33,7 @@ def main(args):
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
     ts = ts.replace(':', '-')
-    ts = ts+'-yelp-ortho'
+    ts = ts+'-multitask'
 
     # prepare dataset
     splits = ['train', 'test']
