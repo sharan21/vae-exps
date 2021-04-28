@@ -1,6 +1,8 @@
 import os
 import io
+import random
 import json
+import jsonlines
 import torch
 import pickle
 import time
@@ -27,6 +29,9 @@ class SnliYelp(Dataset):
         if not os.path.exists("./data/snli_yelp"):
             os.makedirs("./data/snli_yelp")
 
+
+        
+
         self.data_dir = "./data/snli_yelp"
         self.yelp_data_dir = "./data/yelp/"
         self.snli_data_dir = "./data/snli/"
@@ -40,14 +45,19 @@ class SnliYelp(Dataset):
         self.min_occ = kwargs.get('min_occ', 3)
 
         # self.num_lines = 560000
-        self.num_lines = 56000
+        self.num_lines = 56
         self.have_vocab = have_vocab
 
         self.yelp_raw_data_path = os.path.join(self.yelp_data_dir, 'yelp.'+split+'.csv')
-        self.snli_raw_data_path = os.path.join(self.snli_data_dir, 'snli.'+split+'.csv')
+        self.snli_raw_data_path = self.snli_data_dir + '/snli_1.0_' + self.split + '.jsonl'
 
         self.combined_preprocessed_data_file = 'snli_yelp.'+split+'.json'
-        self.combined_vocab_file = 'snli_yelp.vocab.json'
+        self.vocab_file = 'snli_yelp.vocab.json'
+
+        if os.path.exists("./data/snli_yelp/"+self.vocab_file):
+            self.have_vocab = True
+        else:
+            self.have_vocab = False
         
          
          # load bow vocab
@@ -109,27 +119,18 @@ class SnliYelp(Dataset):
     def get_i2w(self):
         return self.i2w
 
-    def _load_data_yelp(self, vocab=True):
+    def _load_data(self, vocab=True):
 
         print("loading preprocessed json data...")
 
-        with open(os.path.join(self.yelp_data_dir, self.yelp_preprocessed_data_file), 'r') as file:
-            self.data_yelp = json.load(file)
-        if vocab:
-            with open(os.path.join(self.yelp_data_dir, self.yelp_vocab_file), 'r') as file:
-                vocab = json.load(file)
-            self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
-    
-    def _load_data_snli(self, vocab=True):
-
-        print("loading preprocessed json data...")
-
-        with open(os.path.join(self.data_dir, self.preprocessed_data_file), 'r') as file:
+        with open(os.path.join(self.data_dir, self.combined_preprocessed_data_file), 'r') as file:
             self.data = json.load(file)
         if vocab:
             with open(os.path.join(self.data_dir, self.vocab_file), 'r') as file:
                 vocab = json.load(file)
             self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
+    
+
 
 
     def _load_vocab(self):
@@ -154,7 +155,7 @@ class SnliYelp(Dataset):
 
         # first for yelp
 
-        data_yelp = defaultdict(dict)
+        data = defaultdict(dict)
 
         with open(self.yelp_raw_data_path, 'r') as file:
 
@@ -164,103 +165,7 @@ class SnliYelp(Dataset):
                     break
 
                 # separate the label and the line
-                label = float(line[1])-1
-                line = line[4:]
-
-                words = tokenizer.tokenize(line)
-
-                input = ['<sos>'] + words
-                input = input[:self.max_sequence_length]
-
-                target = words[:self.max_sequence_length-1]
-                target = target + ['<eos>']
-        
-    
-                assert len(input) == len(target), "%i, %i" % (len(input), len(target))
-
-                length = len(input)
-
-                input.extend(['<pad>'] * (self.max_sequence_length-length))
-                target.extend(['<pad>'] * (self.max_sequence_length-length))
-
-                input = [self.w2i.get(w, self.w2i['<unk>']) for w in input]
-                target = [self.w2i.get(w, self.w2i['<unk>']) for w in target]
-
-                id = len(data)
-                data_yelp[id]['input'] = input
-                data_yelp[id]['label'] = label
-                data_yelp[id]['target'] = target
-                data_yelp[id]['length'] = length
-
-
-        # now for snli
-        data_snli = defaultdict(dict)
-
-        with open(self.snli_raw_data_path, 'r') as file:
-
-            for i, line in enumerate(tqdm(file, total=self.num_lines)):
-
-                if(i == self.num_lines):
-                    break
-
-                # separate the label and the line
-                label = float(line[1])-1
-                line = line[4:]
-
-                words = tokenizer.tokenize(line)
-
-                input = ['<sos>'] + words
-                input = input[:self.max_sequence_length]
-
-                target = words[:self.max_sequence_length-1]
-                target = target + ['<eos>']
-        
-    
-                assert len(input) == len(target), "%i, %i" % (len(input), len(target))
-
-                length = len(input)
-
-                input.extend(['<pad>'] * (self.max_sequence_length-length))
-                target.extend(['<pad>'] * (self.max_sequence_length-length))
-
-                input = [self.w2i.get(w, self.w2i['<unk>']) for w in input]
-                target = [self.w2i.get(w, self.w2i['<unk>']) for w in target]
-
-                id = len(data)
-                data_snli[id]['input'] = input
-                data_snli[id]['label'] = label
-                data_snli[id]['target'] = target
-                data_snli[id]['length'] = length
-                # we get batch['bow'] in get_item() instead as bow is too expensive to store
-
-        with io.open(os.path.join(self.data_dir, self.preprocessed_data_file), 'wb') as preprocessed_data_file:
-            data = json.dumps(data, ensure_ascii=False)
-            preprocessed_data_file.write(data.encode('utf8', 'replace'))
-
-        self._load_data(vocab=False)
-    
-    def _create_data_yelp(self):
-
-        if not self.have_vocab and self.split == 'train':
-            print("creating vocab for train!")
-            self._create_vocab()
-            print("finished creating vocab!")
-        else:
-            self._load_vocab()
-            print("loaded vocab from mem!")
-
-        tokenizer = TweetTokenizer(preserve_case=False)
-
-        data = defaultdict(dict)
-        with open(self.raw_data_path, 'r') as file:
-
-            for i, line in enumerate(tqdm(file, total=self.num_lines)):
-
-                if(i == self.num_lines):
-                    break
-
-                # separate the label and the line
-                label = float(line[1])-1
+                label = float(line[1])+3 # so that neg -> 4 and pos -> 5
                 line = line[4:]
 
                 words = tokenizer.tokenize(line)
@@ -288,29 +193,69 @@ class SnliYelp(Dataset):
                 data[id]['target'] = target
                 data[id]['length'] = length
 
-                # we get batch['bow'] in get_item() instead as bow is too expensive to store
+
+        # now for snli
+        # data_snli = defaultdict(dict)
+
+        with jsonlines.open(self.snli_raw_data_path, 'r') as file:
+            for i, line in enumerate(tqdm(file, total=self.num_lines)):
+
+                if(i == self.num_lines):
+                    break
+
+                strline=line['sentence1']+line['sentence2']
+
+                words = tokenizer.tokenize(strline)
+
+                input = ['<sos>'] + words
+                input = input[:self.max_sequence_length]
+
+                target = words[:self.max_sequence_length-1]
+                target = target + ['<eos>']
+
+                assert len(input) == len(target), "%i, %i"%(len(input), len(target))
+                length = len(input)
+
+                input.extend(['<pad>'] * (self.max_sequence_length-length))
+                target.extend(['<pad>'] * (self.max_sequence_length-length))
+
+                input = [self.w2i.get(w, self.w2i['<unk>']) for w in input]
+                target = [self.w2i.get(w, self.w2i['<unk>']) for w in target]
+                
+                
+                labels=['entailment','neutral','contradiction','-']
+                labl=labels.index(line['gold_label'])
+                
+
+                id = len(data)
+                data[id]['input'] = input
+                data[id]['target'] = target
+                data[id]['length'] = length
+                data[id]['label'] = float(labl)
         
-        # combine and shuffle yelp and snli data
+        # shuffle the combined data
+        data = self.shuffle(data)
 
-        data = _combine_yelp_snli_data(data_yelp, data_snli) 
-
-        exit()
-
-
-
-        with io.open(os.path.join(self.data_dir, self.preprocessed_data_file), 'wb') as preprocessed_data_file:
+        with io.open(os.path.join(self.data_dir, self.combined_preprocessed_data_file), 'wb') as preprocessed_data_file:
             data = json.dumps(data, ensure_ascii=False)
             preprocessed_data_file.write(data.encode('utf8', 'replace'))
 
-
         self._load_data(vocab=False)
     
-    
-    def _combine_yelp_snli_data(self, data_yelp, data_snli):
-        data = defaultdict(dict)
+    def shuffle(self, data):
+        
+        keys = [i for i in range(self.num_lines*2)]
+        random.shuffle(keys)
+        data_shuffled = defaultdict(dict)
 
+        i = 0
+        for k in keys:
+            data_shuffled[i] = data[k]
+            i = i+1
 
-        return data
+        return data_shuffled
+
+        
 
     def _create_combined_vocab(self):
         # this function uses both snli + yelp to create vocab
@@ -440,7 +385,16 @@ class SnliYelp(Dataset):
 
 if __name__ == "__main__":
     
+    datasets = OrderedDict()
+
     split = "train"
+    datasets[split] = SnliYelp(
+            split=split,
+            create_data=False,
+            min_occ=3
+        )
+
+    split = "test"
     datasets[split] = SnliYelp(
             split=split,
             create_data=False,

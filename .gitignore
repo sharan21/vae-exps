@@ -2,6 +2,7 @@ __pycache__
 data/yelp/
 data/ptb/
 data/snli/
+data/snli_yelp/
 bin/
 dumps/
 figs
