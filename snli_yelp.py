@@ -43,7 +43,7 @@ class SnliYelp(Dataset):
         self.min_occ = 2
 
         # self.num_lines = 30000 #in each dataset
-        self.num_lines = 5600
+        self.num_lines = 56000
         self.have_vocab = have_vocab
 
         self.yelp_raw_data_path = os.path.join(self.yelp_data_dir, 'yelp.'+split+'.csv')
@@ -83,14 +83,18 @@ class SnliYelp(Dataset):
         
         idx = str(idx)
         one_hot = np.zeros(6)
+
+        # print(idx)
         
         try:
             one_hot[int(self.data[idx]['label'])] = 1
         except KeyError:
-            while True:
+            i = 0
+            while i < 100:
                 print(idx)
+                i = i+1
                 print(self.data[idx])
-            exit()
+            # exit()
 
         return {
             'input': np.asarray(self.data[idx]['input']),
@@ -251,12 +255,15 @@ class SnliYelp(Dataset):
     
     def shuffle(self, data):
         
-        keys = [i for i in range(self.num_lines*2)]
+        keys = [i for i in range(len(data))]
         random.shuffle(keys)
         data_shuffled = defaultdict(dict)
 
         i = 0
         for k in keys:
+            if(data[k] is None):
+                print("error in shuffle")
+                exit()
             data_shuffled[i] = data[k]
             i = i+1
 
@@ -316,48 +323,48 @@ class SnliYelp(Dataset):
 
         self._load_vocab()
 
-    def convert_(self): #does not seemed to be used
+    # def convert_(self): #does not seemed to be used
 
-        if self.split == 'train':
-            self._create_vocab()
-        else:
-            self._load_vocab()
+    #     if self.split == 'train':
+    #         self._create_vocab()
+    #     else:
+    #         self._load_vocab()
 
-        tokenizer = TweetTokenizer(preserve_case=False)
+    #     tokenizer = TweetTokenizer(preserve_case=False)
 
-        data = defaultdict(dict)
-        with open(self.raw_data_path, 'r') as file:
+    #     data = defaultdict(dict)
+    #     with open(self.raw_data_path, 'r') as file:
 
-            for i, line in enumerate(file):
+    #         for i, line in enumerate(file):
 
-                words = tokenizer.tokenize(line)
+    #             words = tokenizer.tokenize(line)
 
-                input = ['<sos>'] + words
-                input = input[:self.max_sequence_length]
+    #             input = ['<sos>'] + words
+    #             input = input[:self.max_sequence_length]
 
-                target = words[:self.max_sequence_length-1]
-                target = target + ['<eos>']
+    #             target = words[:self.max_sequence_length-1]
+    #             target = target + ['<eos>']
 
-                assert len(input) == len(target), "%i, %i" % (
-                    len(input), len(target))
-                length = len(input)
+    #             assert len(input) == len(target), "%i, %i" % (
+    #                 len(input), len(target))
+    #             length = len(input)
 
-                input.extend(['<pad>'] * (self.max_sequence_length-length))
-                target.extend(['<pad>'] * (self.max_sequence_length-length))
+    #             input.extend(['<pad>'] * (self.max_sequence_length-length))
+    #             target.extend(['<pad>'] * (self.max_sequence_length-length))
 
-                input = [self.w2i.get(w, self.w2i['<unk>']) for w in input]
-                target = [self.w2i.get(w, self.w2i['<unk>']) for w in target]
+    #             input = [self.w2i.get(w, self.w2i['<unk>']) for w in input]
+    #             target = [self.w2i.get(w, self.w2i['<unk>']) for w in target]
 
-                id = len(data)
-                data[id]['input'] = input
-                data[id]['target'] = target
-                data[id]['length'] = length
+    #             id = len(data)
+    #             data[id]['input'] = input
+    #             data[id]['target'] = target
+    #             data[id]['length'] = length
 
-        with io.open(os.path.join(self.data_dir, self.preprocessed_data_file), 'wb') as preprocessed_data_file:
-            data = json.dumps(data, ensure_ascii=False)
-            preprocessed_data_file.write(data.encode('utf8', 'replace'))
+    #     with io.open(os.path.join(self.data_dir, self.preprocessed_data_file), 'wb') as preprocessed_data_file:
+    #         data = json.dumps(data, ensure_ascii=False)
+    #         preprocessed_data_file.write(data.encode('utf8', 'replace'))
 
-        self._load_data(vocab=False)
+    #     self._load_data(vocab=False)
     
     def _get_bow_representations(self, text_sequence):
         """
