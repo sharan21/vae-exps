@@ -39,11 +39,11 @@ class SnliYelp(Dataset):
         self.bow_hidden_dim = 7526
 
         # self.max_sequence_length = 1165
-        self.max_sequence_length = 5 # yelp as 116, snli has 50, take max
+        self.max_sequence_length = 100 # yelp as 116, snli has 50, take max
         self.min_occ = 2
 
-        self.num_lines = 30000 #in each dataset
-        # self.num_lines = 56
+        # self.num_lines = 30000 #in each dataset
+        self.num_lines = 5600
         self.have_vocab = have_vocab
 
         self.yelp_raw_data_path = os.path.join(self.yelp_data_dir, 'yelp.'+split+'.csv')

@@ -8,7 +8,8 @@ from utils import to_var, idx2word, interpolate, load_model_params_from_checkpoi
 
 
 def main(args):
-    with open(args.data_dir+'/snli/snli.vocab.json', 'r') as file:
+
+    with open(args.data_dir+'/snli_yelp/snli_yelp.vocab.json', 'r') as file:
         vocab = json.load(file)
 
     w2i, i2w = vocab['w2i'], vocab['i2w']
@@ -34,12 +35,15 @@ def main(args):
     
     model.eval()
 
+    # print(params['latent_size'])
+    # exit()
+
     samples, z = model.inference(n=args.num_samples)
     print('----------SAMPLES----------')
     print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
 
-    z1 = torch.randn([args.latent_size]).numpy()
-    z2 = torch.randn([args.latent_size]).numpy()
+    z1 = torch.randn([params['latent_size']]).numpy()
+    z2 = torch.randn([params['latent_size']]).numpy()
     z = to_var(torch.from_numpy(interpolate(start=z1, end=z2, steps=8)).float())
     samples, _ = model.inference(z=z)
     print('-------INTERPOLATION-------')

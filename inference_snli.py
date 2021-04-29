@@ -38,8 +38,8 @@ def main(args):
     print('----------SAMPLES----------')
     print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
 
-    z1 = torch.randn([args.latent_size]).numpy()
-    z2 = torch.randn([args.latent_size]).numpy()
+    z1 = torch.randn([params['latent_size']]).numpy()
+    z2 = torch.randn([params['latent_size']]).numpy()
     z = to_var(torch.from_numpy(interpolate(start=z1, end=z2, steps=8)).float())
     samples, _ = model.inference(z=z)
     print('-------INTERPOLATION-------')
