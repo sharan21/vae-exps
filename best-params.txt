@@ -1,0 +1,8 @@
+1. batch_size = 8
+2. max_seq = 100
+3. num_lines = 5600
+
+ortho = false
+diversity = false
+self_attn = false
+

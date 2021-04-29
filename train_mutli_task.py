@@ -16,7 +16,7 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import torch.nn as nn
 
-from model_multitask_ortho import SentenceVaeStyleOrtho
+from model_multitask import SentenceVaeStyleOrtho
 from snli_yelp import SnliYelp
 from utils import idx2word
 import argparse
@@ -34,6 +34,14 @@ def main(args):
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
     ts = ts.replace(':', '-')
     ts = ts+'-multitask'
+
+    
+    if(ortho):
+        ts = ts+'-ortho'
+    if(hspace_classifier):
+        ts = ts+'-hspace'
+    if(attention):
+        ts = ts+'-self-attn'
 
     # prepare dataset
     splits = ['train', 'test']

@@ -15,20 +15,35 @@ from collections import OrderedDict, defaultdict
 
 from utils import OrderedCounter
 from tqdm import tqdm
+import torch.nn.functional as F
+import torch.nn as nn
 
-from model import SentenceVAE
-from yelpd import Yelpd
-
+from model_yelp import SentenceVaeStyleOrtho
+from yelpd import Yelpd         
+from utils import idx2word
 import argparse
 
 
 def main(args):
 
+    ################ config your params here ########################
+    ortho = True
+    attention = False
+    hspace_classifier = False
+    diversity = False
+    
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
     ts = ts.replace(':', '-')
-    ts = ts+"-yelp"
+    s = ts + '-yelp'
 
+    if(ortho):
+        ts = ts+'-ortho'
+    if(hspace_classifier):
+        ts = ts+'-hspace'
+    if(attention):
+        ts = ts+'-self-attn'
+        
     # prepare dataset
     splits = ['train', 'test']
 
@@ -43,6 +58,10 @@ def main(args):
             create_data=args.create_data,
             min_occ=args.min_occ
         )
+
+    
+    i2w = datasets['train'].get_i2w()
+    w2i = datasets['train'].get_w2i()
 
     # get training params
     params = dict(
@@ -59,11 +78,15 @@ def main(args):
         embedding_dropout=args.embedding_dropout,
         latent_size=args.latent_size,
         num_layers=args.num_layers,
-        bidirectional=args.bidirectional
+        bidirectional=args.bidirectional,
+        ortho=ortho,
+        attention=attention,
+        hspace_classifier=hspace_classifier,
+        diversity=diversity
     )
 
     # init model object
-    model = SentenceVAE(**params)
+    model = SentenceVaeStyleOrtho(**params)
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -94,30 +117,36 @@ def main(args):
             return min(1, step/x0)
 
     # defining NLL loss to measure accuracy of the decoding
-    NLL = torch.nn.NLLLoss(
-        ignore_index=datasets['train'].pad_idx, reduction='sum')
+    NLL = torch.nn.NLLLoss(ignore_index=datasets['train'].pad_idx, reduction='sum')
+
+    loss_fn_2 = F.cross_entropy
 
     # this functiom is used to compute the 2 loss terms and KL loss weight
     def loss_fn(logp, target, length, mean, logv, anneal_function, step, k, x0):
 
+        
+
         # cut-off unnecessary padding from target, and flatten
         target = target[:, :torch.max(length).item()].contiguous().view(-1)
         logp = logp.view(-1, logp.size(2))
+
+        print(logp.shape)
+        print(target.shape)
+        exit()
+
+       
 
         # Negative Log Likelihood
         NLL_loss = NLL(logp, target)
 
         # KL Divergence
         KL_loss = -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp())
-
         KL_weight = kl_anneal_function(anneal_function, step, k, x0)
 
         return NLL_loss, KL_loss, KL_weight
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
-
     tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
-
     step = 0
 
     for epoch in range(args.epochs):
@@ -149,33 +178,42 @@ def main(args):
                 # get batch size
                 batch_size = batch['input'].size(0)
 
-                # print(batch['input'].shape)
-                # exit(0)
-
                 for k, v in batch.items():
                     if torch.is_tensor(v):
                         batch[k] = to_var(v)
 
                 # Forward pass
-                logp, mean, logv, z = model(batch['input'], batch['length'])
+                logp, final_mean, final_logv, final_z, style_preds, content_preds, hspace_preds, diversity_loss = model(batch['input'], batch['length'], batch['label'], batch['bow'])
 
                 # loss calculation
-                NLL_loss, KL_loss, KL_weight = loss_fn(
-                    logp, batch['target'], batch['length'], mean, logv, args.anneal_function, step, args.k, args.x0)
+                NLL_loss, KL_loss, KL_weight = loss_fn(logp, batch['target'], batch['length'], final_mean, final_logv, args.anneal_function, step, args.k, args.x0)
+                style_loss = nn.MSELoss()(style_preds, batch['label'].type(torch.FloatTensor).cuda()) #classification loss
+                content_loss = nn.MSELoss()(content_preds, batch['bow'].type(torch.FloatTensor).cuda()) #classification loss
+
+                if(hspace_preds is None):
+                    hspace_classifier_loss = 0
+                else:
+                    hspace_classifier_loss = nn.MSELoss()(hspace_preds, batch['label'].type(torch.FloatTensor).cuda()) 
 
                 # final loss calculation
-                loss = (NLL_loss + KL_weight * KL_loss) / batch_size
+                loss = (NLL_loss + KL_weight * KL_loss) / batch_size + 1000 * style_loss + 1000*content_loss
+                # loss = (NLL_loss + KL_weight * KL_loss) / batch_size 
 
                 # backward + optimization
                 if split == 'train':
                     optimizer.zero_grad()  # flush grads
-                    loss.backward()  # run bp
+                    
+                    if(diversity):
+                        loss.backward(retain_graph = True)  # run bp
+                        diversity_loss.backward()
+                    else:
+                        loss.backward()  # run bp
+
                     optimizer.step()  # run gd
                     step += 1
 
-                # bookkeepeing
-                tracker['ELBO'] = torch.cat(
-                    (tracker['ELBO'], loss.data.view(1, -1)), dim=0)
+                # bookkeeping
+                tracker['ELBO'] = torch.cat((tracker['ELBO'], loss.data.view(1, -1)), dim=0)
 
                 # logging of losses
                 if args.tensorboard_logging:
@@ -187,12 +225,15 @@ def main(args):
                                       epoch*len(data_loader) + iteration)
                     writer.add_scalar("%s/KL Weight" % split.upper(), KL_weight,
                                       epoch*len(data_loader) + iteration)
+                                      
 
                 #
                 if iteration % args.print_every == 0 or iteration+1 == len(data_loader):
-                    print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f"
+                   print("%s Batch %04d/%i, Loss %9.4f, NLL-Loss %9.4f, KL-Loss %9.4f, KL-Weight %6.3f, Style-Loss %9.4f, Content-Loss %9.4f, Hspace-Loss %9.4f, Diversity-Loss %9.4f"
                           % (split.upper(), iteration, len(data_loader)-1, loss.item(), NLL_loss.item()/batch_size,
-                             KL_loss.item()/batch_size, KL_weight))
+                             KL_loss.item()/batch_size, KL_weight, style_loss, content_loss, hspace_classifier_loss, diversity_loss))
+                    
+  
 
                 if split == 'valid':
                     if 'target_sents' not in tracker:
@@ -229,15 +270,12 @@ def main(args):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-
-    # parser.add_argument('--dataset', type=str, default='yelp')
-    # parser.add_argument('--data_dir', type=str, default='data')
+    
     parser.add_argument('--create_data', action='store_true')
-    # parser.add_argument('--max_sequence_length', type=int, default=116)
-    parser.add_argument('--min_occ', type=int, default=1)
+    parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=1)
+    parser.add_argument('-ep', '--epochs', type=int, default=10)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
@@ -245,9 +283,9 @@ if __name__ == '__main__':
     parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')
     parser.add_argument('-hs', '--hidden_size', type=int, default=256)
     parser.add_argument('-nl', '--num_layers', type=int, default=1)
-    parser.add_argument('-bi', '--bidirectional', action='store_true')
-    parser.add_argument('-ls', '--latent_size', type=int, default=16)
-    parser.add_argument('-wd', '--word_dropout', type=float, default=0)
+    parser.add_argument('-bi', '--bidirectional', action='store_true') 
+    parser.add_argument('-ls', '--latent_size', type=int, default=40)
+    parser.add_argument('-wd', '--word_dropout', type=float, default=0.0)
     parser.add_argument('-ed', '--embedding_dropout', type=float, default=0.5)
 
     parser.add_argument('-af', '--anneal_function', type=str, default='logistic')
@@ -257,9 +295,11 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--print_every', type=int, default=50)
     parser.add_argument('-tb', '--tensorboard_logging', action='store_true')
     parser.add_argument('-log', '--logdir', type=str, default='logs')
-    # parser.add_argument('-bin', '--save_model_path', type=str, default='bin')
 
     args = parser.parse_args()
+    
+    #NOTE: if bidirection = true, NLL will overfit, Classifiers will underfit, so dont use this
+    # args.bidirectional = True
 
     args.rnn_type = args.rnn_type.lower()
     args.anneal_function = args.anneal_function.lower()

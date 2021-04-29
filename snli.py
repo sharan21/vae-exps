@@ -26,11 +26,7 @@ class SNLI(Dataset):
         self.num_lines = 550153
         self.bow_hidden_dim = 7526
 
-        if not os.path.exists(self.vocab_file):
-            self.have_vocab = False
-        else:
-            self.have_vocab = True
-
+        
 
         self.raw_data_path = self.data_dir + 'snli_1.0_' + self.split + '.jsonl'
         self.data_file = 'snli.'+ split +'.json'
@@ -38,6 +34,11 @@ class SNLI(Dataset):
 
         with open("./bow.json") as f:
             self.bow_filtered_vocab_indices = json.load(f)
+
+        if not os.path.exists(self.vocab_file):
+            self.have_vocab = False
+        else:
+            self.have_vocab = True
 
         # if create_data:
         #     print("Creating new %s snli data."%split.upper())
@@ -50,6 +51,9 @@ class SNLI(Dataset):
         else:
             print(" found preprocessed files, no need tooo create data!")
             self._load_data()
+        
+      
+
 
 
     def __len__(self):

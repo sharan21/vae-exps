@@ -43,7 +43,7 @@ class SnliYelp(Dataset):
         self.min_occ = 2
 
         # self.num_lines = 30000 #in each dataset
-        self.num_lines = 56000
+        self.num_lines = 5600
         self.have_vocab = have_vocab
 
         self.yelp_raw_data_path = os.path.join(self.yelp_data_dir, 'yelp.'+split+'.csv')

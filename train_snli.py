@@ -18,7 +18,7 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import torch.nn as nn
 
-from model_snli_ortho import SentenceVaeStyleOrtho
+from model_snli import SentenceVaeStyleOrtho
 from snli import SNLI
 from utils import idx2word
 import argparse
@@ -27,7 +27,7 @@ import argparse
 def main(args):
 
     ################ config your params here ########################
-    ortho = False
+    ortho = True
     attention = False
     hspace_classifier = False
     diversity = False
@@ -35,7 +35,14 @@ def main(args):
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
     ts = ts.replace(':', '-')
-    ts = ts+'-yelp-ortho'
+    ts = ts + '-snli'
+
+    if(ortho):
+        ts = ts+'-ortho'
+    if(hspace_classifier):
+        ts = ts+'-hspace'
+    if(attention):
+        ts = ts+'-self-attn'
 
     # prepare dataset
     splits = ['train', 'test']
@@ -268,8 +275,8 @@ if __name__ == '__main__':
     parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=10)
-    parser.add_argument('-bs', '--batch_size', type=int, default=32)
+    parser.add_argument('-ep', '--epochs', type=int, default=20)
+    parser.add_argument('-bs', '--batch_size', type=int, default=8)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
     parser.add_argument('-eb', '--embedding_size', type=int, default=300)

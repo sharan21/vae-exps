@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+
+import numpy as np
 import torch.nn.utils.rnn as rnn_utils
 from utils import to_var
 from torch.autograd import Variable
@@ -182,13 +184,13 @@ class SentenceVaeStyleOrtho(nn.Module):
 			
 			content_z = content_z - u_v/u_u * style_z #orthogonalised content
 
-
 		####################### orthogonalise content_z w.r.t style_z using Gram schmitt
 		
 		if(self.diversity): #from https://arxiv.org/abs/1704.08300 and https://arxiv.org/abs/2004.14243
-			diversity_loss = style_z*content_z # B*latent_size
-			diversity_loss = torch.sum(diversity_loss, axis=-1) #B
-			diversity_loss = torch.mean(diversity_loss, axis=0) #1
+			# diversity_loss = style_z*content_z # B*latent_size
+			# diversity_loss = torch.sum(diversity_loss, axis=-1) #B
+			# diversity_loss = torch.mean(diversity_loss, axis=0) #1
+			diversity_loss = self.conicity_measure(style_z, content_z).mean(axis = -1)
 		else:
 			diversity_loss = 0
 
@@ -374,9 +376,18 @@ class SentenceVaeStyleOrtho(nn.Module):
 		# styles, contents: B*latent_size/2
 		# conicities: B
 
-		mean_vector = (styles+contents)/2
-		style_atm = torch.sum(styles*mean_vector, axis = 1)
-		content_atm = torch.sum(contents*mean_vector, axis = 1)
+		mean_vector = (styles+contents)/2 # compute mean
+		
+		# compute magnitudes
+		styles_magn = torch.linalg.norm(styles, dim=-1)
+		contents_magn = torch.linalg.norm(contents, dim=-1)
+		mean_vector_magn = torch.linalg.norm(contents, dim=-1)
+	
+		# compute cosines
+		style_atm = torch.sum(styles*mean_vector, axis = 1)/(styles_magn*mean_vector_magn)
+		content_atm = torch.sum(contents*mean_vector, axis = 1)/(contents_magn*mean_vector_magn)
+
+		# take avg of atm
 		conicities = (style_atm+content_atm)/2
 
 		return conicities
