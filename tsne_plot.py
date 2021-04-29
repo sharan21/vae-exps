@@ -4,7 +4,6 @@ import torch
 import argparse
 from torch.utils.data import Dataset
 from multiprocessing import cpu_count
-# from utils import to_var, idx2word, expierment_name
 from torch.utils.data import DataLoader
 from collections import OrderedDict, defaultdict
 import numpy as np
@@ -19,16 +18,6 @@ from utils import to_var, idx2word, interpolate, load_model_params_from_checkpoi
 
 
 def main(args):
-    with open(args.data_dir+'/yelp/yelpd.vocab.json', 'r') as file:
-        vocab = json.load(file)
-
-    w2i, i2w = vocab['w2i'], vocab['i2w']
-
-    if not os.path.exists(args.load_checkpoint):
-        raise FileNotFoundError(args.load_checkpoint)
-
-    if not os.path.exists(args.load_params):
-        raise FileNotFoundError(args.load_params)
 
     # load params
     params = load_model_params_from_checkpoint(args.load_params)
@@ -83,23 +72,14 @@ def main(args):
                 hidden_emb=hidden_emb.squeeze().cpu().detach().numpy()
                 tsne_values= np.append(tsne_values, hidden_emb, axis=0)
                 tsne_labels=np.append(tsne_labels, batch_labels, axis=0)
-                # print(tsne_labels.shape)
-                # print(batch_labels.shape)
-                
-                # exit()
-                
-                
-                # print(type(hidden_emb))
+
                 if iteration==3:
                     break
             
-    # print(tsne_values.shape)
     pca = PCA(n_components=20)
     pca_result = pca.fit_transform(tsne_values)
     tsne = TSNE(n_components=2, verbose = 1)
     tsne_results = tsne.fit_transform(pca_result[:])
-    # print(tsne_results.shape)
-    # print(tsne_labels.shape)
     color_map = np.argmax(tsne_labels, axis=1)
     plt.figure(figsize=(10,10))
     for cl in range(2):
@@ -107,20 +87,8 @@ def main(args):
         indices = indices[0]
         plt.scatter(tsne_results[indices,0], tsne_results[indices, 1], label=cl)
     plt.legend()
-    # plt.show()
     plt.savefig('trial1.png')
             
-
-    # samples, z = model.inference(n=args.num_samples)
-    # print('----------SAMPLES----------')
-    # print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
-
-    # z1 = torch.randn([args.latent_size]).numpy()
-    # z2 = torch.randn([args.latent_size]).numpy()
-    # z = to_var(torch.from_numpy(interpolate(start=z1, end=z2, steps=8)).float())
-    # samples, _ = model.inference(z=z)
-    # print('-------INTERPOLATION-------')
-    # print(*idx2word(samples, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
 
 
 if __name__ == '__main__':
