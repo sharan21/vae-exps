@@ -16,7 +16,7 @@ from collections import OrderedDict, defaultdict
 from utils import OrderedCounter
 from tqdm import tqdm
 
-from model import SentenceVAE
+from model_ptb import SentenceVAE
 from yelpd import Yelpd
 
 import argparse
