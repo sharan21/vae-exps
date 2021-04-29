@@ -11,7 +11,7 @@ from collections import OrderedDict, defaultdict
 
 from ptb import PTB
 from utils import to_var, idx2word, expierment_name
-from model import SentenceVAE
+from model_ptb import SentenceVAE
 
 
 def main(args):
@@ -216,7 +216,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_occ', type=int, default=1)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=10)
+    parser.add_argument('-ep', '--epochs', type=int, default=15)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
