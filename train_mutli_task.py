@@ -279,8 +279,8 @@ if __name__ == '__main__':
     parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=20)
-    parser.add_argument('-bs', '--batch_size', type=int, default=32)
+    parser.add_argument('-ep', '--epochs', type=int, default=5)
+    parser.add_argument('-bs', '--batch_size', type=int, default=8)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
     parser.add_argument('-eb', '--embedding_size', type=int, default=300)

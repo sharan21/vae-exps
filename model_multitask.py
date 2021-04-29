@@ -337,37 +337,55 @@ class SentenceVaeStyleOrtho(nn.Module):
 
 		return save_to
 
-	def encode_to_lspace(self, input_sequence, length):
+	def encode_to_lspace(self, input_sequence):
 
 		batch_size = input_sequence.size(0) #get batch size
-		sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
-		input_sequence = input_sequence[sorted_idx] #get sorted sentences
-
 		input_embedding = self.embedding(input_sequence) # convert to embeddings
-
-		#pad inputs to uniform length
-		packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True) #(B, L, E)
-
-		_, hidden = self.encoder_rnn(packed_input) # hidden -> (B, H)
-
-		# if the RNN has multiple layers, flatten all the hiddens states 
+		
+		################### encoder ##################
+		_, hidden = self.encoder(input_embedding) # hidden -> (B, H)
+	
+		###### if the RNN has multiple layers, flatten all the hiddens states 
 		if self.bidirectional or self.num_layers > 1:
-			# flatten hidden state
-			hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor)
+		    hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
 		else:
 			hidden = hidden.squeeze()
 
-		#encoder RNN done, hidden now contains the final hidden states to be mapped into prob dist.
+		####### self attention
+		if(self.attention):
+			hidden = self.self_attention(output, hidden)
+		
+		####### if the RNN has multiple layers, flatten all the hiddens states 
+		if self.bidirectional or self.num_layers > 1:
+			hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
+		else:
+			hidden = hidden.squeeze()
 
-		# REPARAMETERIZATION
-		mean = self.hidden2mean(hidden) #calc latent mean 
-		logv = self.hidden2logv(hidden) #calc latent variance
-		std = torch.exp(0.5 * logv) #find sd
+		############style component
 
-		z = to_var(torch.randn([batch_size, self.latent_size])) #get a random vector
-		z = z * std + mean #compute datapoint
+		style_mean = self.hidden2stylemean(hidden) #calc latent mean 
+		style_logv = self.hidden2stylelogv(hidden) #calc latent variance
+		style_std = torch.exp(0.5 * style_logv) #find sd
 
-		return z
+		style_z = to_var(torch.randn([batch_size, int(self.latent_size/2)])) #get a random vector
+		style_z = style_z * torch.exp(style_logv) + style_mean #copmpute datapoint
+
+		############content component
+
+		content_mean = self.hidden2contentmean(hidden) #calc latent mean 
+		content_logv = self.hidden2contentlogv(hidden) #calc latent variance
+		content_std = torch.exp(0.5 * content_logv) #find sd
+
+		content_z = to_var(torch.randn([batch_size, int(self.latent_size/2)])) #get a random vector
+		content_z = content_z * torch.exp(content_logv) + content_mean #compute datapoint
+
+		#############concat style and concat
+		
+		final_mean = torch.cat((style_mean, content_mean), dim=1)
+		final_logv = torch.cat((style_logv, content_logv), dim=1)
+		final_z = torch.cat((style_z, content_z), dim=1)
+
+		return style_z, content_z
 
 	def conicity_measure(self, styles, contents):
     	# conicity is defined as the mean of ATM/ alignment to mean vector
