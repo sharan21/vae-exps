@@ -3,7 +3,7 @@ import json
 import torch
 import argparse
 from collections import defaultdict
-from model_multitask import SentenceVaeStyleOrtho
+from model_multitask import SentenceVaeMultiTask
 from utils import to_var, idx2word, interpolate, load_model_params_from_checkpoint
 from snli_yelp import SnliYelp
 # import num
@@ -39,7 +39,7 @@ def main(args):
     params = load_model_params_from_checkpoint(args.load_params)
 
     # create model
-    model = SentenceVaeStyleOrtho(**params)
+    model = SentenceVaeMultiTask(**params)
 
     print(model)
     model.load_state_dict(torch.load(args.load_checkpoint))
@@ -53,7 +53,7 @@ def main(args):
     # get random sentence 1 from snli
     sent1 = datasets[split].__getitem__(6)
     # get random sentence 1 from yelp
-    sent2 = datasets[split].__getitem__(55)
+    sent2 = datasets[split].__getitem__(74)
 
     
     # get the lspace vectors for sent1 and sent2
@@ -63,12 +63,19 @@ def main(args):
     style_z, content_z = model.encode_to_lspace(batch)
 
     # print sent1 and 2
-    print("sent 1:")
+    print()
+    print("Sentence 1:")
+    print()
     print(*idx2word(sent1_tokens, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
+    print()
 
-    print("sent 1:")
+    print("Sentence 2:")
+    print()
     print(*idx2word(sent2_tokens, i2w=i2w, pad_idx=w2i['<pad>']), sep='\n')
+    print()
 
+    print("Style of Sentence2 on content of Sentence1:")
+    print()
     # contact style_z of sent 1 to content_z of sent_2
     final_z = torch.cat((style_z[1], content_z[0]), -1).unsqueeze(0)
     samples, _ = model.inference(z=final_z)

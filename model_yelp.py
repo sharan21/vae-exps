@@ -5,7 +5,7 @@ from utils import to_var
 from torch.autograd import Variable
 
 
-class SentenceVaeStyleOrtho(nn.Module):
+class SentenceVaeYelp(nn.Module):
 	def __init__(self, vocab_size, embedding_size, rnn_type, hidden_size, word_dropout, embedding_dropout, latent_size,
 				sos_idx, eos_idx, pad_idx, unk_idx, max_sequence_length, num_layers=1, bidirectional=False, ortho=False, 
 				attention=False, hspace_classifier=False, diversity=False):

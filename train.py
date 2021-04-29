@@ -16,8 +16,14 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import torch.nn as nn
 
-from model_multitask import SentenceVaeStyleOrtho
+from model_multitask import SentenceVaeMultiTask
+from model_snli import SentenceVaeSnli
+from model_yelp import SentenceVaeYelp
+
 from snli_yelp import SnliYelp
+from yelpd import Yelpd
+from snli import SNLI
+
 from utils import idx2word
 import argparse
 
@@ -33,7 +39,7 @@ def main(args):
     # create dir name
     ts = time.strftime('%Y-%b-%d-%H:%M:%S', time.gmtime())
     ts = ts.replace(':', '-')
-    ts = ts+'-multitask'
+    ts = ts+'-'+args.dataset
 
     
     if(args.ortho):
@@ -43,25 +49,36 @@ def main(args):
     if(args.attention):
         ts = ts+'-self-attn'
 
-    # prepare dataset
+   
+
+    if(args.dataset == "multitask"):
+        print("Running multitask dataset!")
+        vae_model = SentenceVaeMultiTask
+        dataset = SnliYelp
+    if(args.dataset == "snli"):
+        print("Running SNLI!")
+        vae_model = SentenceVaeSnli
+        dataset = SNLI
+    if(args.dataset == "yelp"):
+        print("Running Yelp!")
+        vae_model = SentenceVaeYelp
+        dataset = Yelpd
+
+     # prepare dataset
     splits = ['train', 'test']
 
     # create dataset object
     datasets = OrderedDict()
+    
 
     # create test and train split in data, also preprocess
     for split in splits:
         print("creating dataset for: {}".format(split))
-        datasets[split] = SnliYelp(
+        datasets[split] = dataset(
             split=split,
             create_data=args.create_data,
             min_occ=args.min_occ
         )
-
-    # it = datasets['test'].__getitem__(257)    
-    # print(it)
-    # print(y)
-    # exit()
 
     i2w = datasets['train'].get_i2w()
     w2i = datasets['train'].get_w2i()
@@ -84,12 +101,12 @@ def main(args):
         bidirectional=args.bidirectional,
         ortho=args.ortho,
         attention=args.attention,
-        hspace_classifier=args.hspace_classifier,
+        hspace_classifier=args.hspace,
         diversity=args.diversity
     )
 
     # init model object
-    model = SentenceVaeStyleOrtho(**params)
+    model = vae_model(**params)
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -228,14 +245,7 @@ def main(args):
                     optimizer.step()  # run gd
                     step += 1
 
-                # update losses log
                 
-                loss_at_epoch['nll_loss'] = float(NLL_loss)
-                loss_at_epoch['kl_loss'] = float(KL_loss)
-                loss_at_epoch['style_loss'] = float(style_loss)
-                loss_at_epoch['content_loss'] = float(content_loss)
-                loss_at_epoch['diversity_loss'] = float(diversity_loss)
-                loss_at_epoch['hspace_loss'] = float(hspace_classifier_loss)
 
                 overall_losses[len(overall_losses)] = loss_at_epoch
 
@@ -293,6 +303,15 @@ def main(args):
                     save_model_path, "E%i.pytorch" % epoch)
                 torch.save(model.state_dict(), checkpoint_path)
                 print("Model saved at %s" % checkpoint_path)
+            
+            # update losses log
+                
+            loss_at_epoch['nll_loss'] = float(NLL_loss/args.batch_size)
+            loss_at_epoch['kl_loss'] = float(KL_loss)
+            loss_at_epoch['style_loss'] = float(style_loss)
+            loss_at_epoch['content_loss'] = float(content_loss)
+            loss_at_epoch['diversity_loss'] = float(diversity_loss)
+            loss_at_epoch['hspace_loss'] = float(hspace_classifier_loss)
         
     # write losses to json
     with open(os.path.join(save_model_path, 'losses.json'), 'w') as f:
@@ -307,7 +326,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_occ', type=int, default=2)
     parser.add_argument('--test', action='store_true')
 
-    parser.add_argument('-ep', '--epochs', type=int, default=15)
+    parser.add_argument('-ep', '--epochs', type=int, default=10)
     parser.add_argument('-bs', '--batch_size', type=int, default=8) #works well at 8 for some reason
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
@@ -328,9 +347,10 @@ if __name__ == '__main__':
     parser.add_argument('-tb', '--tensorboard_logging', action='store_true')
     parser.add_argument('-log', '--logdir', type=str, default='logs')
     parser.add_argument('-hspace', '--hspace', type=bool, default=False)
-    parser.add_argument('-attention', '--hspace', type=bool, default=False)
-    parser.add_argument('-diversity', '--hspace', type=bool, default=False)
-    parser.add_argument('-ortho', '--hspace', type=bool, default=False)
+    parser.add_argument('-attention', '--attention', type=bool, default=False)
+    parser.add_argument('-diversity', '--diversity', type=bool, default=False)
+    parser.add_argument('-ortho', '--ortho', type=bool, default=True)
+    parser.add_argument('-dataset', '--dataset', type=str, default='snli')
 
     args = parser.parse_args()
     

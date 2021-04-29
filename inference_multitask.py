@@ -3,7 +3,7 @@ import json
 import torch
 import argparse
 
-from model_multitask_ortho import SentenceVaeStyleOrtho
+from model_multitask import SentenceVaeMultiTask
 from utils import to_var, idx2word, interpolate, load_model_params_from_checkpoint
 
 
@@ -24,7 +24,7 @@ def main(args):
     params = load_model_params_from_checkpoint(args.load_params)
 
     # create model
-    model = SentenceVaeStyleOrtho(**params)
+    model = SentenceVaeMultiTask(**params)
 
     print(model)
     model.load_state_dict(torch.load(args.load_checkpoint))
