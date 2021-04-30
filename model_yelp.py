@@ -380,3 +380,237 @@ class SentenceVaeYelp(nn.Module):
 		conicities = (style_atm+content_atm)/2
 
 		return conicities
+	
+	def tsne_plot(self,input_sequence):
+		batch_size = input_sequence.size(0) #get batch size
+		input_embedding = self.embedding(input_sequence) # convert to embeddings
+		
+		################### encoder ##################
+		_, hidden = self.encoder(input_embedding) # hidden -> (B, H)
+	
+		###### if the RNN has multiple layers, flatten all the hiddens states 
+		if self.bidirectional or self.num_layers > 1:
+		    hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
+		else:
+			hidden = hidden.squeeze()
+
+		####### self attention
+		if(self.attention):
+			if(self.style_content_split != 0.5):
+				print("Cannot orthogonalise style and content embeddings of different dims!")
+				exit()
+			hidden = self.self_attention(output, hidden)
+
+		####### if the RNN has multiple layers, flatten all the hiddens states 
+		if self.bidirectional or self.num_layers > 1:
+			hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
+		else:
+			hidden = hidden.squeeze()
+
+		###################### proposal 1: hspace classifier ##################
+		if(self.hspace_classifier):
+			hspace_preds = self.hspace_classifier_layer(hidden)
+		else:
+			hspace_preds = None
+
+		############## REPARAMETERIZATION of style and content###############
+
+		############style component
+
+		style_mean = self.hidden2stylemean(hidden) #calc latent mean 
+		style_logv = self.hidden2stylelogv(hidden) #calc latent variance
+		style_std = torch.exp(0.5 * style_logv) #find sd
+
+		style_z = to_var(torch.randn([batch_size, int(self.latent_size/2)])) #get a random vector
+		style_z = style_z * torch.exp(style_logv) + style_mean #copmpute datapoint
+
+		############content component
+
+		content_mean = self.hidden2contentmean(hidden) #calc latent mean 
+		content_logv = self.hidden2contentlogv(hidden) #calc latent variance
+		content_std = torch.exp(0.5 * content_logv) #find sd
+
+		content_z = to_var(torch.randn([batch_size, int(self.latent_size/2)])) #get a random vector
+		content_z = content_z * torch.exp(content_logv) + content_mean #compute datapoint
+
+		####################### orthogonalise content_z w.r.t style_z using Gram schmitt
+		
+		if(self.ortho): #from https://arxiv.org/abs/2004.14243
+		
+			u_v = style_z*content_z
+			u_v = torch.sum(u_v, axis=-1).unsqueeze(-1)
+			u_u = style_z*style_z
+			u_u = torch.sum(u_u, axis=-1).unsqueeze(-1)
+			
+			content_z = content_z - u_v/u_u * style_z #orthogonalised content
+
+
+		####################### orthogonalise content_z w.r.t style_z using Gram schmitt
+		
+		if(self.diversity): #from https://arxiv.org/abs/1704.08300 and https://arxiv.org/abs/2004.14243
+			diversity_loss = style_z*content_z # B*latent_size
+			diversity_loss = torch.sum(diversity_loss, axis=-1) #B
+			diversity_loss = torch.mean(diversity_loss, axis=0) #1
+		else:
+			diversity_loss = 0
+
+		#############concat style and concat
+		
+		final_mean = torch.cat((style_mean, content_mean), dim=1)
+		final_logv = torch.cat((style_logv, content_logv), dim=1)
+		final_z = torch.cat((style_z, content_z), dim=1)
+
+		##########3#####style and content classifiers###################
+		
+		style_preds = self.style_classifier(style_z)
+		content_preds = self.content_classifier(content_z)
+
+		######################## DECODER
+		hidden = self.latent2hidden(final_z)
+
+		if self.bidirectional or self.num_layers > 1:
+		    # unflatten hidden state
+		    hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
+		else:
+		    hidden = hidden.unsqueeze(0)
+
+		return hidden
+	
+	def bleu(self,input_sequence,length):
+		batch_size = input_sequence.size(0) #get batch size
+		input_embedding = self.embedding(input_sequence) # convert to embeddings
+		
+		################### encoder ##################
+		_, hidden = self.encoder(input_embedding) # hidden -> (B, H)
+	
+		###### if the RNN has multiple layers, flatten all the hiddens states 
+		if self.bidirectional or self.num_layers > 1:
+		    hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
+		else:
+			hidden = hidden.squeeze()
+
+		####### self attention
+		if(self.attention):
+			if(self.style_content_split != 0.5):
+				print("Cannot orthogonalise style and content embeddings of different dims!")
+				exit()
+			hidden = self.self_attention(output, hidden)
+		# else:
+			# hidden = hidden[-1] # take the last hidden state of lstm
+
+		####### if the RNN has multiple layers, flatten all the hiddens states 
+		if self.bidirectional or self.num_layers > 1:
+			hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor) # flatten hidden state
+		else:
+			hidden = hidden.squeeze()
+
+		###################### proposal 1: hspace classifier ##################
+		if(self.hspace_classifier):
+			hspace_preds = self.hspace_classifier_layer(hidden)
+		else:
+			hspace_preds = None
+
+		############## REPARAMETERIZATION of style and content###############
+
+		############style component
+
+		style_mean = self.hidden2stylemean(hidden) #calc latent mean 
+		style_logv = self.hidden2stylelogv(hidden) #calc latent variance
+		style_std = torch.exp(0.5 * style_logv) #find sd
+
+		style_z = to_var(torch.randn([batch_size, int(self.latent_size/2)])) #get a random vector
+		style_z = style_z * torch.exp(style_logv) + style_mean #copmpute datapoint
+
+		############content component
+
+		content_mean = self.hidden2contentmean(hidden) #calc latent mean 
+		content_logv = self.hidden2contentlogv(hidden) #calc latent variance
+		content_std = torch.exp(0.5 * content_logv) #find sd
+
+		content_z = to_var(torch.randn([batch_size, int(self.latent_size/2)])) #get a random vector
+		content_z = content_z * torch.exp(content_logv) + content_mean #compute datapoint
+
+		####################### orthogonalise content_z w.r.t style_z using Gram schmitt
+		
+		if(self.ortho): #from https://arxiv.org/abs/2004.14243
+		
+			u_v = style_z*content_z
+			u_v = torch.sum(u_v, axis=-1).unsqueeze(-1)
+			u_u = style_z*style_z
+			u_u = torch.sum(u_u, axis=-1).unsqueeze(-1)
+			
+			content_z = content_z - u_v/u_u * style_z #orthogonalised content
+
+
+		####################### orthogonalise content_z w.r.t style_z using Gram schmitt
+		
+		if(self.diversity): #from https://arxiv.org/abs/1704.08300 and https://arxiv.org/abs/2004.14243
+			diversity_loss = style_z*content_z # B*latent_size
+			diversity_loss = torch.sum(diversity_loss, axis=-1) #B
+			diversity_loss = torch.mean(diversity_loss, axis=0) #1
+		else:
+			diversity_loss = 0
+
+		#############concat style and concat
+		
+		final_mean = torch.cat((style_mean, content_mean), dim=1)
+		final_logv = torch.cat((style_logv, content_logv), dim=1)
+		final_z = torch.cat((style_z, content_z), dim=1)
+
+		##########3#####style and content classifiers###################
+		
+		style_preds = self.style_classifier(style_z)
+		content_preds = self.content_classifier(content_z)
+
+		######################## DECODER
+		hidden = self.latent2hidden(final_z)
+
+		if self.bidirectional or self.num_layers > 1:
+			# unflatten hidden state
+			hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
+
+		hidden = hidden.unsqueeze(0)
+
+		# required for dynamic stopping of sentence generation
+		sequence_idx = torch.arange(0, batch_size, out=self.tensor()).long()  # all idx of batch
+		# all idx of batch which are still generating
+		sequence_running = torch.arange(0, batch_size, out=self.tensor()).long()
+		sequence_mask = torch.ones(batch_size, out=self.tensor()).bool()
+		# idx of still generating sequences with respect to current loop
+		running_seqs = torch.arange(0, batch_size, out=self.tensor()).long()
+
+		generations = self.tensor(batch_size, self.max_sequence_length).fill_(self.pad_idx).long()
+
+		t = 0
+		while t < self.max_sequence_length and len(running_seqs) > 0:
+
+			if t == 0:
+				input_sequence = to_var(torch.Tensor(batch_size).fill_(self.sos_idx).long())
+
+			input_sequence = input_sequence.unsqueeze(1)
+			input_embedding = self.embedding(input_sequence)
+			output, hidden = self.decoder(input_embedding, hidden)
+			logits = self.outputs2vocab(output)
+			input_sequence = self._sample(logits)
+
+			# save next input
+			generations = self._save_sample(generations, input_sequence, sequence_running, t)
+
+			# update gloabl running sequence
+			sequence_mask[sequence_running] = (input_sequence != self.eos_idx)
+			sequence_running = sequence_idx.masked_select(sequence_mask)
+
+			# update local running sequences
+			running_mask = (input_sequence != self.eos_idx).data
+			running_seqs = running_seqs.masked_select(running_mask)
+
+			# prune input and hidden state according to local update
+			if len(running_seqs) > 0:
+				input_sequence = input_sequence[running_seqs]
+				hidden = hidden[:, running_seqs]
+
+				running_seqs = torch.arange(0, len(running_seqs), out=self.tensor()).long()
+
+			t += 1
+
+		return generations
