@@ -11,9 +11,10 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 from nltk.translate import bleu_score
+import nltk.translate
 
 
-from model_ptb import SentenceVAE
+from model_yelp import SentenceVaeYelp
 from yelpd import Yelpd
 from utils import to_var, idx2word, interpolate, load_model_params_from_checkpoint
 
@@ -29,7 +30,7 @@ def main(args):
     params = load_model_params_from_checkpoint(args.load_params)
 
     # create model
-    model = SentenceVAE(**params)
+    model = SentenceVaeYelp(**params)
 
     print(model)
     model.load_state_dict(torch.load(args.load_checkpoint))
@@ -86,12 +87,12 @@ def main(args):
                 bleus=bleu_score.corpus_bleu(all_actual, generated)
                 total_bleu=total_bleu+bleus
                 total_iterations=iteration+1
-                # if iteration==:
+                # if iteration==1:
                 #     break
             
-            bleu_score=total_bleu/total_iterations
+            bleuscore=total_bleu/total_iterations
             print("BLEU score for Yelp dataset is:")
-            print(bleu score)
+            print(bleuscore)
     
                 
             
