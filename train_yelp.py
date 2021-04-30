@@ -18,7 +18,7 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import torch.nn as nn
 
-from model_yelp import SentenceVaeStyleOrtho
+from model_yelp import SentenceVaeYelp
 from yelpd import Yelpd         
 from utils import idx2word
 import argparse
@@ -86,7 +86,7 @@ def main(args):
     )
 
     # init model object
-    model = SentenceVaeStyleOrtho(**params)
+    model = SentenceVaeYelp(**params)
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -130,9 +130,6 @@ def main(args):
         target = target[:, :torch.max(length).item()].contiguous().view(-1)
         logp = logp.view(-1, logp.size(2))
 
-        print(logp.shape)
-        print(target.shape)
-        exit()
 
        
 
