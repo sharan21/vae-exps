@@ -171,7 +171,13 @@ def main(args):
         'style_loss': 0.0,
         'content_loss': 0.0,
         'diversity_loss': 0.0,
-        'hspace_loss': 0.0
+        'hspace_loss': 0.0,
+        'nll_loss_test': 0.0,
+        'kl_loss_test': 0.0,
+        'style_loss_test': 0.0,
+        'content_loss_test': 0.0,
+        'diversity_loss_test': 0.0,
+        'hspace_loss_test': 0.0
     }
 
     for epoch in range(args.epochs):
@@ -305,13 +311,20 @@ def main(args):
                 print("Model saved at %s" % checkpoint_path)
             
             # update losses log
-                
-            loss_at_epoch['nll_loss'] = float(NLL_loss/args.batch_size)
-            loss_at_epoch['kl_loss'] = float(KL_loss)
-            loss_at_epoch['style_loss'] = float(style_loss)
-            loss_at_epoch['content_loss'] = float(content_loss)
-            loss_at_epoch['diversity_loss'] = float(diversity_loss)
-            loss_at_epoch['hspace_loss'] = float(hspace_classifier_loss)
+            if(split == "train"):
+                loss_at_epoch['nll_loss'] = float(NLL_loss/args.batch_size)
+                loss_at_epoch['kl_loss'] = float(KL_loss)
+                loss_at_epoch['style_loss'] = float(style_loss)
+                loss_at_epoch['content_loss'] = float(content_loss)
+                loss_at_epoch['diversity_loss'] = float(diversity_loss)
+                loss_at_epoch['hspace_loss'] = float(hspace_classifier_loss)
+            else:
+                loss_at_epoch['nll_loss_test'] = float(NLL_loss/args.batch_size)
+                loss_at_epoch['kl_loss_test'] = float(KL_loss)
+                loss_at_epoch['style_loss_test'] = float(style_loss)
+                loss_at_epoch['content_loss_test'] = float(content_loss)
+                loss_at_epoch['diversity_loss_test'] = float(diversity_loss)
+                loss_at_epoch['hspace_loss_test'] = float(hspace_classifier_loss)
         
     # write losses to json
     with open(os.path.join(save_model_path, 'losses.json'), 'w') as f:
@@ -327,7 +340,7 @@ if __name__ == '__main__':
     parser.add_argument('--test', action='store_true')
 
     parser.add_argument('-ep', '--epochs', type=int, default=10)
-    parser.add_argument('-bs', '--batch_size', type=int, default=8) #works well at 8 for some reason
+    parser.add_argument('-bs', '--batch_size', type=int, default=32) #works well at 8 for some reason
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001)
 
     parser.add_argument('-eb', '--embedding_size', type=int, default=300)
@@ -349,7 +362,7 @@ if __name__ == '__main__':
     parser.add_argument('-hspace', '--hspace', type=bool, default=False)
     parser.add_argument('-attention', '--attention', type=bool, default=False)
     parser.add_argument('-diversity', '--diversity', type=bool, default=False)
-    parser.add_argument('-ortho', '--ortho', type=bool, default=True)
+    parser.add_argument('-ortho', '--ortho', type=bool, default=False)
     parser.add_argument('-dataset', '--dataset', type=str, default='snli')
 
     args = parser.parse_args()

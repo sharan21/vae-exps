@@ -91,7 +91,7 @@ def main(args):
             
             bleu_score=total_bleu/total_iterations
             print("BLEU score for Yelp dataset is:")
-            print(bleu score)
+            print(bleu_score)
     
                 
             

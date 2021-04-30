@@ -4,13 +4,30 @@ This is the repository for our NLP project (CS5803) implemented from scratch. We
 
 ## For single dataset generation aka without multitask style transfer (ptb/yelp/snli)
 
-Here is an example on how to download, train and infer from the Yelp dataset.
+Here is an example on how to download, train the Yelp dataset.
 
     bash download_yelp.sh
-    python3 train_yelp.py
+    python3 train.py -dataset yelp
+
+For sample generation and inference.
+
     python3 inference_yelp.py -n 1 -c 'path/to/checkpoint.pytorch' -p 'path/to/model_params.json'
 
+## For single dataset generation aka without multitask style transfer (ptb/yelp/snli)
 
+Here is an example on how to download, train the multitask SNLI+Yelp dataset for general style
+
+	bash download_yelp.sh
+	bash download_snli.sh
+    python3 train.py -dataset multitask
+
+For sample generation and inference.
+
+    python3 inference_multitask.py -n 1 -c 'path/to/checkpoint.pytorch' -p 'path/to/model_params.json'
+
+For style transfer between two sentences
+
+	python3 style_transfer.py -n 1 -c 'path/to/checkpoint.pytorch' -p 'path/to/model_params.json'
 
 
 # Overall Progress
@@ -37,10 +54,10 @@ All tasks marked "later" are not essential to the current work
 ## Proposal 1 (Training a classifier on hidden states to boost performance)
 
 		1. add classifier over hidden space (done)
-		2. add self attention (done, fix bugs)
+		2. add self attention (done)
 		3. add tsne function  (done)
 		4. add bleu scores  (done)
-		5. compare performances, ablation study 
+		5. compare performances, ablation study (done)
 
 
 ## Proposal 2 (An orthogonalisation based approach to disentanglement)
@@ -58,7 +75,7 @@ All tasks marked "later" are not essential to the current work
 		2. add SNLI model and POC of style transfer (done)
 		3. add multi task style classifier with yelp + snli (done)
 		4. add inter class style transfer (done)
-		5. add style grafting (done, testing)
+		5. add style grafting (done)
 
 ## Misc bugs:
 		0. fix NLL loss bug (done)
