@@ -233,6 +233,42 @@ class SentenceVAE(nn.Module):
         z = z * std + mean #compute datapoint
 
         return z
+    
+    def tsne_plot(self,input_sequence):
+        batch_size = input_sequence.size(0) #get batch size
+        # sorted_lengths, sorted_idx = torch.sort(length, descending=True) #sort input sequences into inc order
+        # input_sequence = input_sequence[sorted_idx] #get sorted sentences
+
+        input_embedding = self.embedding(input_sequence) # convert to embeddings
+
+        #pad inputs to uniform length
+        # packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True) #(B, L, E)
+
+        _, hidden = self.encoder_rnn(input_embedding) # hidden -> (B, H)
+
+        # if the RNN has multiple layers, flatten all the hiddens states 
+        if self.bidirectional or self.num_layers > 1:
+            # flatten hidden state
+            hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor)
+        else:
+            hidden = hidden.squeeze()
+
+        
+        #encoder RNN done, hidden now contains the final hidden states to be mapped into prob dist.
+
+        # REPARAMETERIZATION
+
+        mean = self.hidden2mean(hidden) #calc latent mean 
+        logv = self.hidden2logv(hidden) #calc latent variance
+        std = torch.exp(0.5 * logv) #find sd
+
+        z = to_var(torch.randn([batch_size, self.latent_size])) #get a random vector
+        z = z * std + mean #compute datapoint
+
+        # DECODER
+        hidden = self.latent2hidden(z)
+
+        return hidden
 
 
     def bleu(self,input_sequence,length):
